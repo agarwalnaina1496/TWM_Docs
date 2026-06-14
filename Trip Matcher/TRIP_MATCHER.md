@@ -2,9 +2,11 @@
 
 ## Overview
 
-Trip Matcher is Phase 1 of TravelWithMe. Its job is to take a traveler from "I want to go somewhere" to "I know exactly where I'm going and why it's right for me" — without them needing to verify it anywhere else.
+Trip Matcher takes a traveler from "I want to go somewhere" to "I know exactly where I'm going and why it's right for me" — without them needing to verify it anywhere else.
 
-It is built on two agents and a knowledge layer:
+It is an independent, stateless feature. It does not know about Trip Planner. It does not communicate with Trip Planner. It reads Trip State at open, does its job, and writes back to Trip State when something changes.
+
+Trip Matcher is built on two agents and a knowledge layer:
 
 - **Scout** — Conversation Agent. The only interface the traveler sees.
 - **Meridian** — Decision Engine. Runs all matching logic. Invisible to the traveler.
@@ -15,16 +17,16 @@ It is built on two agents and a knowledge layer:
 ## Architecture
 
 ```
-Traveler
-    ↕  (conversation)
-  Scout
-    ↕  (structured payload)
- Meridian
-    ↕  (semantic query + structured filters)
+  Trip State
+      ↕
+    Scout  (conversation layer)
+      ↕
+   Meridian  (decision engine)
+      ↕
 Destination KB + Maps API
 ```
 
-The traveler only ever talks to Scout. Meridian and the KB are completely invisible. The traveler's experience is a conversation. The intelligence behind it is Meridian.
+The traveler only ever talks to Scout. Meridian and the KB are completely invisible.
 
 ---
 
@@ -32,9 +34,15 @@ The traveler only ever talks to Scout. Meridian and the KB are completely invisi
 
 ### Stage 1: Intake
 
-Scout opens the conversation and begins collecting inputs. It starts with the highest-signal questions — trip goal, origin, travel month, budget — and builds naturally from there.
+Scout opens with the current `matcher_inputs` from Trip State. If the user is starting fresh, all fields are null and Scout starts from scratch. If the user is returning, Scout resumes — it does not restart.
 
-Scout does not ask for everything upfront. Inputs emerge through the conversation. Scout recognizes passively mentioned details (group type, exclusions, preferences) and doesn't re-ask for things already said.
+Scout begins collecting inputs through natural conversation. It starts with the highest-signal questions — trip goal, origin, travel month, budget — and builds from there. It does not ask for everything upfront. Inputs emerge through conversation.
+
+Scout recognises passively mentioned details (group type, exclusions, preferences) and does not re-ask for things already said.
+
+Trip State `stage` → `matching` as soon as any input is collected.
+
+After each exchange, `trip_state.matcher_inputs` is updated with the latest inputs.
 
 ---
 
@@ -42,9 +50,9 @@ Scout does not ask for everything upfront. Inputs emerge through the conversatio
 
 Before calling Meridian, Scout checks:
 
-- Are all 5 required inputs present? If not, ask for what's missing.
-- Are any inputs ambiguous? If so, resolve before proceeding.
-- Are any inputs in obvious conflict? If so, surface the conflict and ask the traveler to resolve it.
+- Are all 5 required inputs present? If not, ask for what is missing.
+- Are any inputs ambiguous? Resolve before proceeding.
+- Are any inputs in obvious conflict? Surface the conflict, ask the traveler to resolve it.
 
 Scout never sends an incomplete or unresolved payload to Meridian.
 
@@ -77,7 +85,7 @@ Scout translates Meridian's structured output into natural conversation.
 
 - Lead with the top recommendation and the core reason it fits
 - Show budget, reachability, weather, and tradeoffs
-- Offer to show alternatives — don't dump all three at once
+- Offer to show alternatives — do not dump all three at once
 - Be honest about weaknesses
 
 ---
@@ -86,7 +94,7 @@ Scout translates Meridian's structured output into natural conversation.
 
 Scout asks whether the recommendation lands. Based on the traveler's response and Meridian's refinement hooks, Scout asks targeted follow-up questions, updates the payload, and calls Meridian again.
 
-The loop continues until the traveler confirms a destination or exits.
+`trip_state.matcher_inputs` is updated after each turn.
 
 ```
 Call Meridian
@@ -95,24 +103,36 @@ Present output
     ↓
 Traveler responds
     ↓
-Adjust: update payload → call Meridian again
+Adjust: update inputs → call Meridian again
     OR
-Confirm: capture decision → exit
+Confirm: write to Trip State → done
 ```
 
 ---
 
-### Stage 6: Decision Confirmation
+### Stage 6: Confirmation
 
-When the traveler signals confidence in a destination, Scout confirms the decision and captures the full context as the Trip Matcher handoff artifact.
+When the traveler confirms a destination, Scout outputs the final result. Trip State is updated:
 
-This artifact becomes the input to Phase 2 (Trip Planner).
+```json
+{
+  "stage": "matched",
+  "destination": {
+    "name": "Coorg",
+    "confirmed_via": "matcher",
+    "why_it_matched": "Scenic, peaceful, great for couples in October, easy from Bengaluru.",
+    "shortlist_considered": ["Coorg", "Wayanad", "Munnar"]
+  }
+}
+```
+
+Trip Matcher's job is done. The user decides what to do next. They may move to Planner, they may not. That is not Trip Matcher's concern.
 
 ---
 
 ## Failure State Flow
 
-When Meridian returns a failure state, Scout does not dead-end. It translates the failure into a plain-language explanation and re-engages the traveler with a targeted question.
+When Meridian returns a failure state, Scout translates it into plain language and re-engages the traveler with a targeted question.
 
 ```
 Meridian returns HARD_FAIL
@@ -121,34 +141,10 @@ Scout: "Nothing matched all your criteria. The main conflict was [X]. Want to lo
     ↓
 Traveler adjusts preference
     ↓
-Updated payload → Meridian again
+matcher_inputs updated → Meridian called again
 ```
 
-See the Failure State section in the Meridian doc for all failure types and the Scout doc for how each is communicated.
-
----
-
-## Handoff Artifact (Trip Matcher → Trip Planner)
-
-When Trip Matcher is complete, Scout outputs a structured artifact capturing the full decision context. This is the input to Phase 2.
-
-```json
-{
-  "confirmed_destination": "Coorg",
-  "travel_month": "October",
-  "duration_nights": 3,
-  "num_travelers": 2,
-  "group_type": "couple",
-  "trip_goal": "relaxation",
-  "travel_style": ["scenic", "relaxed"],
-  "budget_total": 45000,
-  "budget_flexibility": "moderate",
-  "origin_city": "Bengaluru",
-  "exclusions": ["no_trekking"],
-  "why_it_matched": "Scenic hill destination well-suited for couples, peaceful atmosphere, accessible from Bengaluru, great in October.",
-  "traveler_notes": "Prefers a homestay over a resort. Not interested in organised tours."
-}
-```
+See Failure State section in the Meridian doc for all failure types. See Scout doc for how each is communicated to the traveler.
 
 ---
 
