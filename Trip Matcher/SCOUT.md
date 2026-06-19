@@ -137,7 +137,7 @@ UI sends `trip_state.trip_context`. Backend extracts what Meridian needs.
 
 ### What UI sends to Scout for presentation
 
-After Meridian returns, UI calls `/api/scout/present` with full TripState and the Meridian output. Scout translates into natural conversation and writes `last_recommendations` to `matcher_state` via `state_delta`.
+After Meridian returns, UI writes the full Meridian output to `matcher_state.last_recommendations` in TripState, then calls `POST /api/scout` with `message: null`. Scout reads `last_recommendations` from TripState and presents. Same endpoint, same request shape — Scout infers presentation mode from `message: null` and populated `last_recommendations`.
 
 ---
 
