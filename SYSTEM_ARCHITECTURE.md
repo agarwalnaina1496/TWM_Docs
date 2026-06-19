@@ -23,18 +23,31 @@ This is the same model as Swiggy. The menu doesn't know about the cart. The cart
 
 No orchestration layer. No routing logic. No entry points enforced by the system. Each feature is independently accessible. Each reads and writes Trip State.
 
+### Backend
+
+```
+UI (Browser)
+    ↕
+Backend (single service)
+    ├── POST /api/scout      →  Anthropic API (Scout system prompt)
+    └── POST /api/meridian   →  Anthropic API (Meridian system prompt)
+                                + Supabase (KB query)
+```
+
+Two endpoints. `POST /api/scout` handles all user messages and Meridian output presentation — `message: null` signals post-Meridian presentation mode. `POST /api/meridian` is called only on button tap. Scout and Meridian do not know about each other.
+
 ---
 
 ## Features
 
 ### Trip Matcher (Phase 1)
-Helps the user find the right destination. Built on Scout (Conversation Agent) and Meridian (Decision Engine). Reads `required_inputs` and `trip_preferences` from Trip State on open. Writes back as inputs are collected. Sets `selected_option` on confirmation.
+Helps the user find the right destination. Built on Scout (`POST /api/scout`) and Meridian (`POST /api/meridian`). Reads `trip_context` and `matcher_state` from TripState. Writes back as inputs are collected and destination is confirmed.
 
 ### Trip Planner (Phase 2)
-Helps the user plan the trip once a destination is known. Reads `selected_option`, `required_inputs`, and `trip_preferences` from Trip State on open. Works even if Matcher was never used — user may have come in with a destination already in mind.
+Helps the user plan the trip once a destination is known. Reads `trip_context` from TripState. Does not read `matcher_state`. Works whether or not Matcher was used.
 
 ### Future Features
-Any future feature follows the same pattern — reads relevant Trip State fields, does its job, writes back.
+Any future feature follows the same pattern — reads relevant TripState sections, does its job, writes back.
 
 ---
 
