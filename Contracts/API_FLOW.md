@@ -14,14 +14,14 @@ The UI calls Scout for every user interaction. It calls Meridian only when the u
 UI (Browser)
     ↕
 Backend (single service)
-    ├── POST /api/scout      →  Anthropic API (Scout system prompt)
-    └── POST /api/meridian   →  Anthropic API (Meridian system prompt)
+    ├── POST /scout      →  (Scout system prompt)
+    └── POST /meridian   →  (Meridian system prompt)
                                 + Supabase (KB query)
 ```
 
 ---
 
-## POST /api/scout
+## POST /scout
 
 Handles all Scout interactions. One endpoint, one request shape, one response shape.
 
@@ -273,7 +273,7 @@ Only changed fields appear in `state_delta`. UI merges — does not replace. If 
 
 ---
 
-## POST /api/meridian
+## POST /meridian
 
 Called on button tap only. Returns recommendations. Never called by Scout.
 
@@ -454,7 +454,7 @@ UI sends `trip_state.trip_context` directly. No wrapping needed.
 ```
 User sends message
         ↓
-POST /api/scout
+POST /scout
   body: { trip_state, message: "..." }
         ↓
 Deep-merge state_delta into trip_state → localStorage
@@ -477,14 +477,14 @@ User taps "Generate Recommendations"
         ↓
 Button enters loading state
         ↓
-POST /api/meridian
+POST /meridian
   body: { trip_context: trip_state.trip_context }
         ↓
 Write full Meridian response to
   trip_state.matcher_state.last_recommendations
   → localStorage
         ↓
-POST /api/scout
+POST /scout
   body: { trip_state (with last_recommendations populated), message: null }
         ↓
 Deep-merge state_delta → localStorage
@@ -501,14 +501,14 @@ Meridian output — SUCCESS or FAILURE — always goes to `last_recommendations`
 ```
 User responds with adjustment
         ↓
-POST /api/scout
+POST /scout
   body: { trip_state, message: "What if we go in October instead?" }
         ↓
 Scout extracts adjustment → state_delta
 Deep-merge → localStorage
         ↓
 if generate_ready = true → show Generate button
-User taps → POST /api/meridian → POST /api/scout (message: null)
+User taps → POST /meridian → POST /scout (message: null)
         ↓
 Updated recommendations shown
 ```
@@ -520,7 +520,7 @@ Updated recommendations shown
 ```
 User confirms destination
         ↓
-POST /api/scout
+POST /scout
   body: { trip_state, message: "Let's go with Pondicherry" }
         ↓
 Scout returns:
@@ -542,7 +542,7 @@ User refreshes
 UI reads trip_state from localStorage
         ↓
 stage = "new" or "matching":
-    POST /api/scout
+    POST /scout
       body: { trip_state, message: null }
     Scout reads conversation_context and resumes:
     "Welcome back — you were planning a bachelorette
@@ -550,7 +550,7 @@ stage = "new" or "matching":
 
 stage = "ready":
     Show Generate button
-    POST /api/scout
+    POST /scout
       body: { trip_state, message: null }
     Scout re-engages from last_scout_message
 
@@ -566,7 +566,7 @@ stage = "matched":
 ### Scout failure
 
 ```
-POST /api/scout fails (5xx / network)
+POST /scout fails (5xx / network)
         ↓
 UI does not update localStorage
 UI shows: "Something went wrong — try again"
@@ -576,13 +576,13 @@ User resends → retry with same trip_state
 ### Meridian infrastructure failure
 
 ```
-POST /api/meridian fails (5xx)
+POST /meridian fails (5xx)
         ↓
 Write { status: "API_ERROR" } to last_recommendations
-POST /api/scout
+POST /scout
   body: { trip_state, message: null }
 Scout: "Hit a snag — want to try again?"
-User confirms → UI retries /api/meridian
+User confirms → UI retries /meridian
 ```
 
 ### Meridian FAILURE status (expected — not an error)
@@ -591,7 +591,7 @@ User confirms → UI retries /api/meridian
 Meridian returns HARD_FAIL / SOFT_FAIL / BUDGET_FAIL / CONFLICT_FAIL
         ↓
 Write failure response to last_recommendations
-POST /api/scout
+POST /scout
   body: { trip_state, message: null }
 Scout translates → natural follow-up question
 User adjusts → refinement loop
