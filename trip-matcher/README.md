@@ -70,6 +70,10 @@ planner -> deferred planning asks
 
 See [API contracts](API_CONTRACTS.md).
 
+## Prompt Releases
+
+Scout and Meridian use independent, file-based semantic versions. See [Prompt versioning](PROMPT_VERSIONING.md) for the release files, bump policy, enforcement check, and provenance boundary.
+
 ## Architecture And Operations
 
 - [Architecture](../ARCHITECTURE.md)

@@ -93,6 +93,8 @@ Scout is the single conversational entry point. It extracts raw trip context, ro
 
 Details live in [Trip Matcher](trip-matcher/README.md), [Scout](trip-matcher/SCOUT.md), and [Meridian](trip-matcher/MERIDIAN.md).
 
+Scout and Meridian prompts are independently released using file-based semantic versions. The version registry, changelog policy, and repository enforcement rules are defined in [Prompt versioning](trip-matcher/PROMPT_VERSIONING.md). Runtime provenance is backend-owned; an LLM-returned version string is not authoritative prompt metadata.
+
 Reads:
 
 ```text
