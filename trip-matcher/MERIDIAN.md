@@ -54,6 +54,54 @@ Meridian reads `trip_state.matcher_state` for matcher continuity: previous recom
 
 ---
 
+## Internal Decision Flow
+
+```mermaid
+flowchart TB
+    Input["Receive trip_context<br/>and matcher_state"]
+    Read["Read all material traveler context<br/>preferences · constraints · timing<br/>budget · companions · history"]
+    Exclusions["Preserve hard exclusions<br/>and explicit preferences"]
+    Enough{"Would recommendations be<br/>useful without misleading<br/>the traveler?"}
+
+    Clarify["Ask exactly one material question<br/>status = NEEDS_CLARIFICATION<br/>options = empty"]
+    Evaluate["Evaluate destination-level fit<br/>season · duration · reachability<br/>budget · pace · group context"]
+    CurrentFacts{"Are time-sensitive facts<br/>material to the answer?"}
+    Verify["Verify with available tools<br/>or add a booking-time caveat"]
+    Viable{"Are there viable options?"}
+
+    FailureCause{"What prevents<br/>a viable match?"}
+    Budget["BUDGET_FAIL<br/>Budget prevents viable options"]
+    Conflict["CONFLICT_FAIL<br/>Constraints conflict"]
+    Hard["HARD_FAIL<br/>No viable option"]
+
+    Tradeoffs{"Do all viable options have<br/>meaningful trade-offs?"}
+    Soft["Use SOFT_FAIL<br/>and explain the trade-offs"]
+    Success["Use SUCCESS"]
+    Rank["Rank up to three options"]
+    Explain["Build why_ranked_here<br/>matches · trade-offs · sections"]
+    Output["Return message + state_delta<br/>status + options"]
+
+    Input --> Read --> Exclusions --> Enough
+    Enough -->|No| Clarify --> Output
+    Enough -->|Yes| Evaluate --> CurrentFacts
+    CurrentFacts -->|Yes| Verify --> Viable
+    CurrentFacts -->|No| Viable
+
+    Viable -->|No| FailureCause
+    FailureCause -->|Budget| Budget --> Output
+    FailureCause -->|Conflicting constraints| Conflict --> Output
+    FailureCause -->|Otherwise| Hard --> Output
+
+    Viable -->|Yes| Tradeoffs
+    Tradeoffs -->|Yes| Soft --> Rank
+    Tradeoffs -->|No| Success --> Rank
+    Rank --> Explain --> Output
+```
+
+The flow is destination-level only. Meridian does not create an itinerary, write lifecycle `stage`, or select an option on the traveler's behalf. When the response reaches the UI, the UI owns lifecycle transitions, recommendation storage, and deterministic selection.
+
+---
+
 ## Output Contract
 
 Meridian always returns valid JSON:

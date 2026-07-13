@@ -71,6 +71,8 @@ flowchart TB
     Status -->|Expected failure| Failure
 ```
 
+For Meridian's context evaluation, clarification, ranking, and failure-classification logic, see the [internal decision flow](MERIDIAN.md#internal-decision-flow).
+
 ## Ownership
 
 | Owner | Responsibilities |
@@ -95,7 +97,7 @@ When the traveler selects a destination or circuit, the UI writes `trip_context.
 ## Related Documentation
 
 - [Overall TWM flow](../README.md)
-- [Meridian behavior](MERIDIAN.md)
+- [Meridian behavior and internal decision flow](MERIDIAN.md#internal-decision-flow)
 - [Trip Matcher API contracts](API_CONTRACTS.md)
 - [TripState](../TRIP_STATE.md)
 - [Lifecycle stage transitions](../STAGE_TRANSITIONS.md)
