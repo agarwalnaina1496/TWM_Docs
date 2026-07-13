@@ -20,56 +20,37 @@ Trip Matcher currently:
 ```mermaid
 flowchart TB
     Start["Scout returns<br/>intent = matcher"]
+    Build["UI builds Meridian phase slice<br/>trip_context + matcher_state"]
+    Handoff["Compact execution handoff<br/>POST /meridian → FastAPI validation<br/>n8n runs Meridian → FastAPI normalizes"]
+    Result["Meridian call result<br/>status + message + state_delta + options<br/>or a technical error"]
 
-    subgraph UI["TWM UI"]
-        Build["Build Meridian phase slice<br/>trip_context + matcher_state"]
-        Call["POST /meridian"]
-    end
-
-    subgraph API["FastAPI on Render"]
-        Route["Validate MeridianRequest"]
-        Prompt["Load active Meridian prompt<br/>and prompt version"]
-        Engine["N8NAgentEngine.meridian"]
-        Normalize["Normalize MeridianResponse<br/>and attach trusted agent_meta"]
-    end
-
-    subgraph Runtime["n8n on EC2 · meridian.json"]
-        Webhook["Meridian webhook"]
-        Agent["Meridian agent<br/>interpret context + match destinations"]
-        Model["Groq chat model<br/>openai/gpt-oss-120b"]
-        Parser["Parse structured output"]
-        Respond["Respond to webhook"]
-
-        Webhook --> Agent
-        Agent <--> Model
-        Agent --> Parser --> Respond
-    end
-
-    Response["Return status + message + state_delta<br/>options + agent_meta"]
-    Infrastructure{"Infrastructure<br/>request succeeded?"}
+    Infrastructure{"Execution and normalized<br/>response valid?"}
     Retry["Do not merge or store output<br/>Show retry message"]
     BusinessStatus{"Known Meridian<br/>business status?"}
     Invalid["Reject invalid status<br/>Do not merge or store output"]
-    Merge["UI merges state_delta"]
+    Merge["UI merges state_delta<br/>and preserves TripState"]
     Status{"Meridian status"}
-    Clarify["NEEDS_CLARIFICATION<br/>Keep stage = matching<br/>Show one question"]
-    Recommendation["SUCCESS<br/>Store recommendation payload<br/>Set stage = recommended"]
-    Failure["SOFT_FAIL · HARD_FAIL<br/>BUDGET_FAIL · CONFLICT_FAIL<br/>Store and render business result<br/>Set stage = recommended"]
-    Select["Traveler chooses an option"]
-    Matched["UI writes selected_option<br/>and sets stage = matched"]
+    Clarify["NEEDS_CLARIFICATION<br/>Show one material question<br/>Keep stage = matching"]
+    Answer["Traveler answers<br/>Scout routes matcher again"]
+    Recommendation["SUCCESS<br/>Store recommendation history<br/>Set stage = recommended"]
+    Cards["Render ranked option cards<br/>with matches and trade-offs"]
+    Failure["SOFT_FAIL · HARD_FAIL<br/>BUDGET_FAIL · CONFLICT_FAIL<br/>Store expected business result<br/>Set stage = recommended"]
+    Explain["Render explanation<br/>and relaxation suggestions"]
+    Select["Traveler selects<br/>a destination or circuit"]
+    Matched["UI writes trip_context.selected_option<br/>and sets stage = matched"]
 
-    Start --> Build --> Call --> Route --> Prompt --> Engine
-    Engine --> Webhook
-    Respond --> Engine --> Normalize --> Response --> Infrastructure
+    Start --> Build --> Handoff --> Result --> Infrastructure
 
     Infrastructure -->|No| Retry
     Infrastructure -->|Yes| BusinessStatus
     BusinessStatus -->|No| Invalid
     BusinessStatus -->|Yes| Merge --> Status
-    Status -->|NEEDS_CLARIFICATION| Clarify --> Start
-    Status -->|SUCCESS| Recommendation --> Select --> Matched
-    Status -->|Expected failure| Failure
+    Status -->|NEEDS_CLARIFICATION| Clarify --> Answer --> Start
+    Status -->|SUCCESS| Recommendation --> Cards --> Select --> Matched
+    Status -->|Expected failure| Failure --> Explain
 ```
+
+The execution handoff is intentionally compact: FastAPI validates and normalizes the contract, while n8n executes Meridian. The primary flow begins when that call returns and the UI decides how to handle the outcome.
 
 For Meridian's context evaluation, clarification, ranking, and failure-classification logic, see the [internal decision flow](MERIDIAN.md#internal-decision-flow).
 
