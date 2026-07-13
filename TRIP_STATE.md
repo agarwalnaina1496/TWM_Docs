@@ -25,14 +25,18 @@ Do not create placeholder fields for information that has not been discovered.
 `trip_context` starts empty:
 
 ```json
-"trip_context": {}
+{
+  "trip_context": {}
+}
 ```
 
 Scout adds fields only when the traveler supplies that signal. There are no predefined trip-context fields, no `required_inputs`, and no null placeholders.
 
 ### Raw Context First
 
-`trip_context` stores raw extracted trip context in the traveler's wording verbatim wherever possible.
+`trip_context` stores useful extracted trip signals in the traveler's wording verbatim wherever possible.
+
+Verbatim preservation applies to each useful value, not to the complete user message, question, or request. Use specific keys that explain the reusable signal; do not use catch-all keys such as `request`, `question`, or `raw_message`.
 
 Do not normalize, convert, score, infer, or compress at the TripState layer.
 
@@ -89,7 +93,7 @@ Meridian and Planner may interpret this raw context later.
 - Do not create null placeholders in trip_context.
 - Do not use required_inputs.
 - Keep values verbatim wherever possible.
-- advisor_state is owned by advice turns.
+- advisor_state persistence is owned by the UI for advice turns.
 - matcher_state is owned by Meridian / Trip Matcher turns.
 - planner_state is null until planning starts.
 ```
@@ -130,26 +134,18 @@ planning             -> traveler moved into planning
 
 `trip_context` is an open object. It is not a form.
 
-`trip_context` keeps common trip context directly at the top level and nests only phase-specific context:
+Every extracted signal is stored directly under `trip_context` using a specific, meaningful key:
 
 ```json
 {
-  "advisor": {},
-  "matcher": {},
-  "planner": {}
+  "origin": "Gujarat",
+  "budget": "around 70k (can also exceed if needed)",
+  "destinations_considered": ["Mussoorie", "Rishikesh", "Haridwar"],
+  "safety_concern": "female solo traveler"
 }
 ```
 
-Use:
-
-```text
-top level -> common facts, constraints, preferences, travel history, timing, budget, companions
-advisor -> direct advice/comparison/question Scout should answer
-matcher -> matcher-related signals for deciding where to go
-planner -> deferred itinerary/logistics/food/must-visit asks
-```
-
-Do not create empty phase buckets. All keys remain open-ended and traveler-wording-first.
+Keys remain open-ended and traveler-wording-first. Arrays and nested objects are allowed when they preserve relationships between distinct signals, but the whole query must not be copied into context.
 
 Example shape:
 
@@ -163,14 +159,11 @@ Example shape:
   "travel_month": "September",
   "duration": "two week vacay",
   "budget": "Budget is not really a constraint so go crazy I suppose",
-  "preferences": {},
-  "travel_history": {},
-  "matcher": {
-    "request": "Would love other suggestions from everyone"
+  "preferences": {
+    "weather": "preferably somewhere with pleasant weather",
+    "crowd_level": "not super crowded"
   },
-  "planner": {
-    "requested_details": []
-  }
+  "planning_preference": "two cities and day trips from there"
 }
 ```
 
@@ -233,7 +226,7 @@ These are examples, not required fields. Scout may create any sensible key when 
 
 ## advisor_state
 
-`advisor_state` stores meaningful advice Scout has already given. It is not chat history.
+`advisor_state` stores meaningful advice Scout has already given. It is not chat history. For `intent = "advise"`, the UI derives this state deterministically from Scout's top-level `message`; Scout does not return a duplicate copy inside `state_delta`.
 
 ```json
 {
@@ -245,13 +238,17 @@ These are examples, not required fields. Scout may create any sensible key when 
       "type": "advice",
       "source": "scout",
       "assistant_message": "verbatim Scout advice",
-      "created_at": "2026-07-09T00:00:00Z"
+      "created_at": "2026-07-09T00:00:00Z",
+      "agent_meta": {
+        "agent": "scout",
+        "prompt_version": "string"
+      }
     }
   ]
 }
 ```
 
-`assistant_message` is stored verbatim, not summarized. Do not duplicate the user's message here; useful traveler-provided context belongs in `trip_context`.
+`assistant_message` is stored verbatim from Scout's visible response, not summarized. The UI also preserves Scout agent metadata when available. Do not duplicate the user's message here; useful traveler-provided context belongs in `trip_context`.
 
 ## matcher_state
 
@@ -276,7 +273,7 @@ Meridian may update `last_meridian_message` and `awaiting` when it asks one soft
 
 Infrastructure failures such as network errors or 5xx responses are not appended to `recommendations`.
 
-`rejected_options` is optional legacy matcher state for recommendation options the traveler rejected during older refinement flows.
+`rejected_options` stores recommendation options the traveler has rejected during refinement.
 
 ## planner_state
 
@@ -325,6 +322,7 @@ The semantic contract should not change when storage moves from localStorage to 
 Reads:
 
 ```text
+stage
 trip_context
 advisor_state
 ```
@@ -333,16 +331,16 @@ Writes deltas for:
 
 ```text
 trip_context
-advisor_state
 ```
+
+Scout also returns the visible `message` and routing `intent`. It does not write `advisor_state`, lifecycle fields, or matcher/planner operational state.
 
 ### Meridian
 
 Reads:
 
 ```text
-common trip_context fields
-trip_context.matcher
+trip_context
 trip_context.selected_option
 matcher_state
 ```
@@ -369,6 +367,13 @@ stage
 selected destination / option
 matcher_state.recommendations
 matcher_state.rejected_options
+```
+
+For Scout advice responses, UI also owns deterministic persistence of:
+
+```text
+advisor_state.conversation_context.last_advisor_message
+advisor_state.artifacts
 ```
 
 ### Planner

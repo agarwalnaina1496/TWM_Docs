@@ -46,11 +46,7 @@ Meridian receives:
 
 `trip_state` is Meridian's phase slice. It is not the full application TripState and does not include lifecycle fields, `stage`, `advisor_state`, `planner_state`, or the raw user message.
 
-Meridian reads every top-level field in `trip_state.trip_context` except `advisor`, `matcher`, `planner`, and `selected_option` as common trip context.
-
-Meridian reads `trip_state.trip_context.matcher` as the active matcher brief. It has no fixed inner schema.
-
-`trip_state.trip_context.planner` should not be present in normal Meridian requests because the UI excludes it. If it is present, Meridian ignores it for execution-level planning.
+Meridian reads the open-ended fields in `trip_state.trip_context` as traveler facts, constraints, preferences, timing, budget, companions, travel history, and other useful context. `selected_option`, when present, is deterministic selection context.
 
 The matcher reads whatever Scout preserved, including arrays and nested objects. Traveler wording is treated as evidence and should not be normalized unless Meridian needs an internal interpretation.
 
@@ -153,7 +149,7 @@ The chat `message` should be a concise shortlist summary, not a duplicate of the
 
 `why_ranked_here` is required for every option. It explains why this option has this rank, not just why the destination is generally good.
 
-Build `why_ranked_here`, `decision_summary.matches`, and `decision_summary.tradeoffs` from material `trip_context.matcher` fields plus material common trip-context fields such as duration, travel month/season, budget, origin/reachability, companions/group type, crowd preference, and weather preference. Every useful field Meridian receives should be considered somewhere in ranking, matches, tradeoffs, sections, or option reasoning.
+Build `why_ranked_here`, `decision_summary.matches`, and `decision_summary.tradeoffs` from material `trip_context` fields such as duration, travel month/season, budget, origin/reachability, companions/group type, crowd preference, and weather preference. Every useful field Meridian receives should be considered somewhere in ranking, matches, tradeoffs, sections, or option reasoning.
 
 For the same query, content depth and practical fit can appear separately. For example, "enough attractions to comfortably spend 3-4 days exploring" explains whether the destination has enough to do, while "3-4 day trip fit" explains pacing and logistics. Month/season fit should be explicit when the travel month materially changes the answer.
 

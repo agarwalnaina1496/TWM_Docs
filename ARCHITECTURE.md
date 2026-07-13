@@ -104,12 +104,11 @@ Scout returns deltas for:
 
 ```text
 trip_context
-advisor_state
 ```
 
-Scout writes `advisor_state` only for meaningful advice turns. Scout receives a phase slice: `stage`, `trip_context`, and `advisor_state`, plus the current user message. Common trip context stays directly under `trip_context`; phase-specific context is nested under `advisor`, `matcher`, and `planner`.
+Scout receives `stage`, `trip_context`, and `advisor_state`, plus the current user message. It extracts specific reusable traveler signals directly under `trip_context`, returns only new or updated context fields in `state_delta`, and returns routing through top-level `intent`. It does not copy the full query into context or write lifecycle/operational state.
 
-Meridian receives a matcher phase slice: common trip context, `trip_context.matcher`, optional `trip_context.selected_option`, and `matcher_state`. It does not receive `trip_id`, `status`, `stage`, `advisor_state`, `planner_state`, `trip_context.advisor`, `trip_context.planner`, or the raw user message. Meridian returns a traveler-facing matcher `message`, a `state_delta`, and recommendation output for UI storage in:
+Meridian receives `trip_context`, optional `trip_context.selected_option`, and `matcher_state`. It does not receive `trip_id`, `status`, `stage`, `advisor_state`, `planner_state`, or the raw user message. Meridian returns a traveler-facing matcher `message`, a `state_delta`, and recommendation output for UI storage in:
 
 ```text
 matcher_state.conversation_context
@@ -123,6 +122,8 @@ stage
 selected destination / option
 matcher_state.rejected_options
 ```
+
+For Scout advice turns, the UI also stores the top-level visible `message` in `advisor_state`, creates the advice artifact and timestamp, and preserves Scout agent provenance. Scout reads this UI-owned memory on useful follow-up or resume turns.
 
 ### Trip Planner
 

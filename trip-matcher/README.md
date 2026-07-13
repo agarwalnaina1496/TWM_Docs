@@ -53,18 +53,12 @@ Traveler talks to Scout
   -> Scout extracts trip_context
   -> Scout returns intent
   -> UI merges state_delta into TripState
-  -> if intent = advise, Scout answers directly
+  -> if intent = advise, Scout answers directly and UI stores the visible advice memory
   -> if intent = matcher, UI calls Meridian in the same chat
   -> if intent = planner, UI/planner layer returns the temporary planner coming-soon response
 ```
 
-TripState is the shared source of truth. `trip_context` starts as `{}`. Common trip context stays directly at the top level, and phase-specific context is nested:
-
-```text
-advisor -> direct advice asks
-matcher -> matcher-related signals for deciding where to go
-planner -> deferred planning asks
-```
+TripState is the shared source of truth. `trip_context` starts as `{}` and stays open-ended. Scout stores every useful extracted signal directly under it using a specific key. Values preserve the traveler's wording where possible, but the full user query is not copied into context.
 
 ## API Contracts
 
