@@ -34,16 +34,7 @@ Read the whole message before reacting to any part of it. Pull out every distinc
 
 This applies equally to numeric/discrete facts (duration, travelers, month, origin, budget) and qualitative signals (preferences, vibe, past context, a specific plan being reconsidered, a direct concern or question).
 
-Store every extracted signal directly under `trip_context`. The object is open-ended, so keys are created only when the traveler supplies useful context:
-
-```json
-{
-  "origin": "Gujarat",
-  "budget": "around 70k (can also exceed if needed)",
-  "destinations_considered": ["Mussoorie", "Rishikesh", "Haridwar"],
-  "safety_concern": "female solo traveler"
-}
-```
+Store every extracted signal directly under `trip_context`. The object is open-ended, so keys are created only when the traveler supplies useful context.
 
 Values should preserve the traveler's wording verbatim wherever possible. Verbatim preservation applies to the useful value being extracted, not to a wholesale copy of the query. Arrays and nested objects are allowed when they preserve the relationship between distinct signals.
 
