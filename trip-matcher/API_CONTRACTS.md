@@ -40,7 +40,11 @@ Response:
   "state_delta": {
     "trip_context": {}
   },
-  "intent": "advise | matcher | planner | null"
+  "intent": "advise | matcher | planner | null",
+  "agent_meta": {
+    "agent": "scout",
+    "prompt_version": "string"
+  }
 }
 ```
 
@@ -48,16 +52,14 @@ Rules:
 
 ```text
 - UI deep-merges state_delta into TripState.
-- trip_context keeps common trip context directly at the top level.
-- Put matcher-related signals under trip_context.matcher.
-- Put planner-related signals under trip_context.planner.
-- Put advice-only signals under trip_context.advisor.
-- Do not create empty phase buckets.
+- Store every extracted traveler signal directly under trip_context using a specific, meaningful key.
+- Preserve useful extracted values verbatim where possible, but do not copy the complete user query into context.
+- Do not use generic catch-all keys such as request, question, or raw_message.
 - Scout should not return required_inputs or a fixed preferences schema.
 - Scout should not write stage, selected_option, recommendations, or rejected_options.
 - Scout should not write recommendation_intent.
-- For `intent = advise`, Scout may write `advisor_state` with verbatim advice artifacts.
-- For any other intent, Scout should write only `trip_context`; phase-owned state stays empty.
+- Scout writes only new or updated traveler-provided fields under state_delta.trip_context.
+- For `intent = advise`, UI stores the top-level Scout message in advisor_state and creates the advice artifact deterministically.
 - intent = advise means Scout answered the current concern directly.
 - intent = matcher means Meridian owns the visible reply.
 - intent = planner means Planner owns the visible reply.
@@ -75,10 +77,7 @@ Request:
 ```json
 {
   "trip_state": {
-    "trip_context": {
-      "...common trip context fields": "...",
-      "matcher": {}
-    },
+    "trip_context": {},
     "matcher_state": {
       "conversation_context": {
         "last_meridian_message": "string | null",
@@ -93,16 +92,13 @@ Request:
 
 `trip_state` is Meridian's phase slice. It must not include `trip_id`, `status`, `stage`, `advisor_state`, `planner_state`, or the raw user message.
 
-The UI sends only:
+The UI sends:
 
 ```text
-common trip_context fields
-trip_context.matcher
+trip_context
 trip_context.selected_option, when present
 matcher_state
 ```
-
-The UI must exclude `trip_context.planner` and `trip_context.advisor` from the normal Meridian request.
 
 Response:
 
@@ -141,7 +137,7 @@ Response:
 }
 ```
 
-`why_ranked_here` is required for every recommendation option. It should explain why this option has this rank by using material `trip_context.matcher` fields plus fit-affecting common trip context such as duration, travel month/season, budget, origin/reachability, companions, weather, crowd preference, and hard exclusions. Every useful field Meridian receives should be considered somewhere in ranking, matches, tradeoffs, sections, or option explanation.
+`why_ranked_here` is required for every recommendation option. It should explain why this option has this rank by using material `trip_context` fields such as duration, travel month/season, budget, origin/reachability, companions, weather, crowd preference, and hard exclusions. Every useful field Meridian receives should be considered somewhere in ranking, matches, tradeoffs, sections, or option explanation.
 
 Meridian should not return `match_sections`, `why_this_works_for_you`, `final_recommendation`, or `refinement_hooks` in the current contract.
 

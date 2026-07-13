@@ -30,25 +30,24 @@ These are two distinct concepts and should never be conflated.
 
 ## Step 1 - Given & Extract
 
-Restate what the traveler actually said, plainly, with no interpretation. Read the whole message before reacting to any part of it. Then pull out every distinct signal, verbatim, only what is actually known. No labels, no summaries, no null placeholders for things not mentioned.
+Read the whole message before reacting to any part of it. Pull out every distinct, reusable trip signal that is actually known, then choose a clear key that describes that signal. Do not store or restate the full user message, question, or request as context.
 
 This applies equally to numeric/discrete facts (duration, travelers, month, origin, budget) and qualitative signals (preferences, vibe, past context, a specific plan being reconsidered, a direct concern or question).
 
-Store extracted facts in `trip_context`. Common trip context stays directly at the top level. Phase-specific context is nested:
+Store every extracted signal directly under `trip_context`. The object is open-ended, so keys are created only when the traveler supplies useful context:
 
 ```json
 {
-  "advisor": {},
-  "matcher": {},
-  "planner": {}
+  "origin": "Gujarat",
+  "budget": "around 70k (can also exceed if needed)",
+  "destinations_considered": ["Mussoorie", "Rishikesh", "Haridwar"],
+  "safety_concern": "female solo traveler"
 }
 ```
 
-Use top-level fields for facts, constraints, preferences, timing, budget, companions, travel history, and other general context. Use `advisor`, `matcher`, and `planner` only for phase-specific asks. Do not create empty buckets.
+Values should preserve the traveler's wording verbatim wherever possible. Verbatim preservation applies to the useful value being extracted, not to a wholesale copy of the query. Arrays and nested objects are allowed when they preserve the relationship between distinct signals.
 
-Inside each bucket there is no predefined schema: keys are created only when the traveler actually provides that information. Values should stay verbatim wherever possible; use arrays or nested objects when that preserves meaning better than flattening.
-
-For Matcher, Scout should preserve matcher-related signals under `matcher` using natural keys from the traveler's wording. For Planner asks that appear before a destination is settled, Scout should preserve them under `planner` but still route the current turn to Matcher.
+Do not use catch-all context keys such as `request`, `question`, or `raw_message`. A concern or ask may still contribute reusable context under a specific key such as `safety_concern`, `destination_scope`, or `planning_preference`.
 
 ## Step 2 - Router
 
@@ -85,7 +84,7 @@ If the query was fully self-contained with nothing further to offer (e.g. local 
 
 ## Runtime State Ownership
 
-`TripState` has a small fixed shell and open-ended phase state:
+`TripState` has a small fixed shell and open-ended traveler context:
 
 ```json
 {
@@ -113,13 +112,13 @@ If the query was fully self-contained with nothing further to offer (e.g. local 
 
 Ownership rules:
 
-- `trip_context` is shared context: common fields stay top-level; `advisor`, `matcher`, and `planner` hold phase-specific context.
-- Scout writes `trip_context` for extraction on every routed turn.
-- Scout writes `advisor_state` only when `intent = "advise"` and the visible answer is meaningful enough to show again on resume.
-- For `intent = "matcher"` or `intent = "planner"`, Scout writes only `trip_context`; phase-owned state stays empty.
-- UI stores the full app TripState. Agent requests are phase slices, not the full app state.
+- `trip_context` is shared, open-ended traveler context. Every extracted signal is stored directly under it using a specific, meaningful key.
+- Scout writes only new or updated traveler-provided fields to `state_delta.trip_context`.
+- Scout owns the top-level response `message` and routing `intent`; it does not write lifecycle or operational state.
+- UI stores the full app TripState and deep-merges Scout's `trip_context` delta. Agent requests are slices, not the full app state.
+- For `intent = "advise"`, UI stores the visible Scout `message` deterministically in `advisor_state` and creates the advice artifact with timestamp and agent provenance.
 - Scout receives `stage`, `trip_context`, `advisor_state`, and the latest `message`.
-- Meridian receives only common trip context, `trip_context.matcher`, optional `trip_context.selected_option`, and `matcher_state`. UI excludes `trip_context.planner` and `trip_context.advisor`.
+- Meridian receives `trip_context`, optional `trip_context.selected_option`, and `matcher_state`.
 - Meridian owns `matcher_state` and the visible matcher reply.
 - Planner will own `planner_state`; for now the UI shows a coming-soon message.
 
@@ -131,33 +130,39 @@ Scout response envelope:
   "state_delta": {
     "trip_context": {}
   },
-  "intent": "advise | matcher | planner | null"
-}
-```
-
-For substantial advice turns, Scout may additionally include:
-
-```json
-{
-  "state_delta": {
-    "advisor_state": {
-      "conversation_context": {
-        "last_advisor_message": "same text as message"
-      },
-      "artifacts": [
-        {
-          "type": "advice",
-          "source": "scout",
-          "assistant_message": "same text as message",
-          "created_at": "ISO-8601 timestamp"
-        }
-      ]
-    }
+  "intent": "advise | matcher | planner | null",
+  "agent_meta": {
+    "agent": "scout",
+    "prompt_version": "string"
   }
 }
 ```
 
-`advisor_state.artifacts[].assistant_message` must be verbatim identical to the top-level `message`. Do not store the user message in advisor artifacts; user-provided facts belong in `trip_context`.
+For an advice turn, UI derives the following state from Scout's top-level response; Scout does not duplicate it in `state_delta`:
+
+```json
+{
+  "advisor_state": {
+    "conversation_context": {
+      "last_advisor_message": "same text as message"
+    },
+    "artifacts": [
+      {
+        "type": "advice",
+        "source": "scout",
+        "assistant_message": "same text as message",
+        "created_at": "UI-generated ISO-8601 timestamp",
+        "agent_meta": {
+          "agent": "scout",
+          "prompt_version": "string"
+        }
+      }
+    ]
+  }
+}
+```
+
+`advisor_state.artifacts[].assistant_message` is verbatim identical to Scout's top-level `message`. The user message is never stored in advice artifacts; its reusable signals belong in `trip_context`.
 
 Resume behavior:
 

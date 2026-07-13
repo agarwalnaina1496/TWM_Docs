@@ -77,26 +77,16 @@ Do not stop extraction after the first useful signal.
 {}
 ```
 
-`trip_context` keeps common trip context directly at the top level and nests only phase-specific context:
+Every useful extracted signal is stored directly under `trip_context` using a specific key:
 
 ```json
 {
-  "advisor": {},
-  "matcher": {},
-  "planner": {}
+  "origin": "Gujarat",
+  "budget": "around 70k (can also exceed if needed)",
+  "destinations_considered": ["Mussoorie", "Rishikesh", "Haridwar"],
+  "safety_concern": "female solo traveler"
 }
 ```
-
-Use:
-
-```text
-top level -> common facts, constraints, preferences, travel history, timing, budget, companions
-advisor -> direct advice/comparison/question Scout should answer
-matcher -> matcher-related signals for deciding where to go
-planner -> deferred itinerary/logistics/food/must-visit asks
-```
-
-Do not create empty phase buckets.
 
 Do not use:
 
@@ -107,11 +97,14 @@ traveler_profile
 null placeholders
 normalized numeric fields
 confidence scores
+request
+question
+raw_message
 ```
 
 Scout adds only what the traveler actually supplied.
 
-The shape inside each bucket is open-ended. Keys should be clear and natural, based on the user's message and the relationship between signals.
+The shape is open-ended. Keys should be clear and natural, based on the user's message and the relationship between signals.
 
 Examples of useful signals to preserve:
 
@@ -127,10 +120,10 @@ constraints or exclusions
 current destination or circuit being considered
 concerns or doubts
 travel history
-explicit request
+specific reusable detail from the ask
 ```
 
-Values should preserve the traveler's wording verbatim wherever possible.
+Values should preserve the traveler's wording verbatim wherever possible. This applies to the useful extracted value, not to a wholesale copy of the user's query.
 
 Examples:
 
@@ -169,33 +162,19 @@ The response should include:
   "state_delta": {
     "trip_context": {}
   },
-  "intent": "advise | matcher | planner | null"
+  "intent": "advise | matcher | planner | null",
+  "agent_meta": {
+    "agent": "scout",
+    "prompt_version": "string"
+  }
 }
 ```
 
 Only include `trip_context` keys that changed this turn.
 
-For substantial `intent = advise` turns, include `advisor_state`:
+Scout does not include `advisor_state`, artifacts, lifecycle fields, or other operational state in `state_delta`. For `intent = advise`, the UI deterministically stores the top-level `message` in `advisor_state` and creates the advice artifact with timestamp and agent provenance.
 
-```json
-{
-  "conversation_context": {
-    "last_advisor_message": "same text as message"
-  },
-  "artifacts": [
-    {
-      "type": "advice",
-      "source": "scout",
-      "assistant_message": "same text as message",
-      "created_at": "ISO-8601 timestamp"
-    }
-  ]
-}
-```
-
-`assistant_message` must be verbatim identical to the top-level `message`. Do not summarize it. Do not include the user's message in the artifact because traveler-provided context belongs in `trip_context`.
-
-For any non-advice intent, Scout should write only `trip_context`. Leave phase-owned state empty.
+For every intent, Scout writes only new or updated traveler-provided context under `state_delta.trip_context`.
 
 Never write deterministic lifecycle state from Scout:
 
