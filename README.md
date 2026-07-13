@@ -49,6 +49,43 @@ Scout does not generate destination rankings. When Scout returns `intent = match
 
 See the [Trip Matcher flow](trip-matcher/README.md) for the complete Meridian request, execution, and response lifecycle.
 
+## Scout Internal Decision Flow
+
+Scout extracts traveler context before deciding who should respond. It routes to the earliest unresolved phase and returns only context added or changed by the current turn.
+
+```mermaid
+flowchart TB
+    Input["Latest message + Scout state slice<br/>stage + trip_context + advisor_state"]
+    HasMessage{"Is message present?"}
+    Extract["Read the complete message<br/>extract every reusable traveler signal"]
+    Delta["Build state_delta.trip_context<br/>new or updated traveler-provided values only"]
+    Resume["Resume from existing context<br/>without extracting new values"]
+    Detect["Detect phase signals<br/>advise + matcher + planner"]
+    Confirm["Evaluate destination confirmation<br/>selected_option or explicit traveler choice"]
+    Advice{"Advice concern, comparison,<br/>question, or doubt?"}
+    Match{"Destination decision needed,<br/>or planning requested without<br/>a confirmed destination?"}
+    Plan{"Planning requested with<br/>a confirmed destination?"}
+
+    Advise["intent = advise<br/>Scout answers directly<br/>and may add a contextual CTA"]
+    Matcher["intent = matcher<br/>Scout preserves context only<br/>Meridian owns the visible response"]
+    Planner["intent = planner<br/>Scout does not create an itinerary<br/>Planner/UI owns the visible response"]
+    Direct["intent = null<br/>Scout answers the self-contained query"]
+    Output["Return structured Scout result<br/>message + state_delta.trip_context + intent<br/>never stage or destination rankings"]
+
+    Input --> HasMessage
+    HasMessage -->|yes| Extract --> Delta --> Detect
+    HasMessage -->|no| Resume --> Detect
+    Detect --> Confirm --> Advice
+    Advice -->|yes| Advise --> Output
+    Advice -->|no| Match
+    Match -->|yes| Matcher --> Output
+    Match -->|no| Plan
+    Plan -->|yes| Planner --> Output
+    Plan -->|no| Direct --> Output
+```
+
+The routing order is `advise → matcher → planner`: when a turn touches multiple phases, Scout selects the earliest phase that is still unresolved. A casually mentioned destination is not confirmation; a deterministic `trip_context.selected_option` or an explicit traveler choice is.
+
 ## Product Documentation
 
 - [Architecture](ARCHITECTURE.md)
