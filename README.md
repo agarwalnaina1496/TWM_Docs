@@ -7,43 +7,31 @@ Travel With Me (TWM) uses Scout as the conversational front door for every trave
 ```mermaid
 flowchart TB
     User["Traveler sends a query"]
+    Build["UI builds Scout request<br/>stage + trip_context + advisor_state + message"]
+    Handoff["Compact Scout execution handoff<br/>POST /scout → FastAPI validation<br/>n8n runs Scout → FastAPI normalizes"]
+    Result["Scout call result<br/>message + state_delta + intent + agent_meta<br/>or a technical error"]
 
-    subgraph UI["TWM UI"]
-        Build["Build Scout request<br/>stage + trip_context + advisor_state + message"]
-        Merge["Merge Scout state_delta<br/>and preserve TripState"]
-        Intent{"Check Scout intent"}
-    end
+    Valid{"Execution and normalized<br/>response valid?"}
+    Retry["Do not merge partial output<br/>Show retryable error"]
+    Merge["UI merges Scout state_delta<br/>and preserves TripState"]
+    Intent{"Scout intent"}
 
-    subgraph API["FastAPI on Render"]
-        ScoutAPI["POST /scout"]
-        ScoutEngine["Load active Scout prompt<br/>and call N8NAgentEngine"]
-        Normalize["Normalize response<br/>and attach trusted agent_meta"]
-    end
+    Advice["intent = advise<br/>Store and show Scout advice"]
+    Matcher["intent = matcher<br/>UI invokes Trip Matcher<br/>Agent: Meridian"]
+    Planner["intent = planner<br/>Show UI-owned coming-soon response"]
+    Direct["intent = null<br/>Show Scout reply when present"]
 
-    subgraph Runtime["n8n on EC2"]
-        ScoutWorkflow["scout.json webhook"]
-        ScoutAgent["Scout<br/>extract context + route turn"]
-        ScoutParser["Parse structured response"]
-        ScoutReply["Return webhook response"]
-
-        ScoutWorkflow --> ScoutAgent --> ScoutParser --> ScoutReply
-    end
-
-    Advice["Advise<br/>UI stores and shows Scout reply"]
-    Matcher["Trip Matcher<br/>Agent: Meridian"]
-    Planner["Trip Planner<br/>UI-owned coming-soon response"]
-    Direct["No phase<br/>Show Scout reply when present"]
-
-    User --> Build --> ScoutAPI
-    ScoutAPI --> ScoutEngine --> ScoutWorkflow
-    ScoutReply --> ScoutEngine
-    ScoutEngine --> Normalize --> Merge --> Intent
+    User --> Build --> Handoff --> Result --> Valid
+    Valid -->|No| Retry --> User
+    Valid -->|Yes| Merge --> Intent
 
     Intent -->|advise| Advice --> User
     Intent -->|matcher| Matcher --> User
     Intent -->|planner| Planner --> User
     Intent -->|null| Direct --> User
 ```
+
+The Scout execution handoff is intentionally compact. The primary product flow begins when the call returns: the UI preserves state, evaluates `intent`, and hands the traveler to the responsible experience.
 
 Scout does not generate destination rankings. When Scout returns `intent = matcher`, the UI calls the Trip Matcher in the same chat turn. Meridian is the agent responsible for the matcher response.
 
