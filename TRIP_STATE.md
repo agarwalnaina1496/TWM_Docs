@@ -6,7 +6,7 @@
 
 `TripState` carries what the traveler has actually told the system, plus lifecycle state needed by the product.
 
-Scout reads the complete `TripState` on every turn and writes deltas. Meridian and Planner read the accumulated `trip_context` later.
+The UI stores the complete `TripState` and sends each agent only its approved phase slice. Scout receives entry/advice turns. After matching handoff, Meridian receives later clarification and refinement turns directly until a terminal outcome.
 
 ## Design Principles
 
@@ -65,6 +65,7 @@ Meridian and Planner may interpret this raw context later.
   "trip_id": "trip_7f3a9c",
   "status": "free",
   "stage": "matching",
+  "active_agent": "meridian",
   "trip_context": {},
   "advisor_state": {
     "conversation_context": {
@@ -93,8 +94,9 @@ Meridian and Planner may interpret this raw context later.
 - Do not create null placeholders in trip_context.
 - Do not use required_inputs.
 - Keep values verbatim wherever possible.
+- active_agent is UI-owned routing state: scout, meridian, or null.
 - advisor_state persistence is owned by the UI for advice turns.
-- matcher_state is owned by Meridian / Trip Matcher turns.
+- matcher_state conversation and rejection context is Meridian-owned; recommendation history is UI-owned.
 - planner_state is null until planning starts.
 ```
 
@@ -129,6 +131,16 @@ recommended          -> Meridian recommendations have been generated and stored
 matched              -> traveler confirmed a destination or circuit
 planning             -> traveler moved into planning
 ```
+
+`active_agent` is separate from `stage`:
+
+```text
+scout    -> UI sends the next entry/advice turn to Scout
+meridian -> UI sends the next matching clarification/refinement directly to Meridian
+null     -> no agent currently owns a specialist conversation
+```
+
+UI sets `active_agent = meridian` after a validated Scout matcher handoff, keeps it through `NEEDS_CLARIFICATION`, clears it on a terminal Meridian outcome, and resets it to `scout` for a new journey.
 
 ## trip_context
 
@@ -273,7 +285,7 @@ Meridian may update `last_meridian_message` and `awaiting` when it asks one soft
 
 Infrastructure failures such as network errors or 5xx responses are not appended to `recommendations`.
 
-`rejected_options` stores recommendation options the traveler has rejected during refinement.
+`rejected_options` stores recommendation options the traveler has rejected during refinement. Meridian may return rejection-context updates in its owned delta; the UI validates and deep-merges them.
 
 ## planner_state
 
@@ -299,13 +311,13 @@ The semantic contract should not change when storage moves from localStorage to 
 | Action | Stage becomes |
 |---|---|
 | TripState created | `new` |
-| Scout routes a turn to Matcher | `matching` |
+| UI handles Scout's validated Matcher handoff | `matching` |
 | Meridian asks a soft clarification | `matching` |
 | Meridian recommendation/failure output is returned to UI | `recommended` |
 | User refines recommendations after `recommended` | `matching` |
 | Destination or circuit confirmed | `matched` |
 | User refines after `matched` | `matching` and selected destination is cleared by UI |
-| Planner started | `planning` |
+| UI enters the unavailable planning phase | `planning` |
 | Plan complete | `planned` |
 
 ### Committed Zone
@@ -343,6 +355,8 @@ Reads:
 trip_context
 trip_context.selected_option
 matcher_state
+advisor_state.conversation_context.last_advisor_message
+current traveler message
 ```
 
 Writes deltas for:
@@ -350,6 +364,7 @@ Writes deltas for:
 ```text
 trip_context
 matcher_state.conversation_context
+matcher_state.rejected_options
 ```
 
 Returns recommendation output for UI to store in:
@@ -364,9 +379,10 @@ Owns deterministic lifecycle writes:
 
 ```text
 stage
+active_agent
 selected destination / option
 matcher_state.recommendations
-matcher_state.rejected_options
+navigation and retry state
 ```
 
 For Scout advice responses, UI also owns deterministic persistence of:
@@ -388,5 +404,6 @@ Writes:
 
 ```text
 planner_state
-stage
 ```
+
+The UI remains the sole owner of `stage` and `active_agent` when Planner is implemented.

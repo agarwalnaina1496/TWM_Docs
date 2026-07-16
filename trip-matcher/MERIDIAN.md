@@ -2,7 +2,7 @@
 
 Meridian is the conversational Trip Matcher.
 
-Scout extracts traveler context and routes matcher turns. Meridian then owns the visible matcher response: it may ask one useful soft clarification, or it may return destination/circuit recommendations with reasoning and tradeoffs.
+Scout extracts traveler context and performs the initial matcher handoff. Meridian then owns the visible matching conversation: it may ask one useful clarification, continue from the traveler's answer, refine prior recommendations, or return a terminal destination/circuit outcome.
 
 Meridian is stateless. It receives the current payload and returns one response.
 
@@ -32,6 +32,11 @@ Meridian receives:
 {
   "trip_state": {
     "trip_context": {},
+    "advisor_state": {
+      "conversation_context": {
+        "last_advisor_message": "string | null"
+      }
+    },
     "matcher_state": {
       "conversation_context": {
         "last_meridian_message": "string | null",
@@ -40,11 +45,14 @@ Meridian receives:
       "recommendations": [],
       "rejected_options": []
     }
-  }
+  },
+  "message": "string | null"
 }
 ```
 
-`trip_state` is Meridian's phase slice. It is not the full application TripState and does not include lifecycle fields, `stage`, `advisor_state`, `planner_state`, or the raw user message.
+`trip_state` is Meridian's phase slice. It is not the full application TripState and does not include lifecycle fields, `stage`, `active_agent`, or `planner_state`.
+
+`advisor_state.conversation_context.last_advisor_message` is minimal read-only handoff context. `message` is the current traveler turn: the initial matcher-triggering turn or a later clarification/refinement sent directly by the UI.
 
 Meridian reads the open-ended fields in `trip_state.trip_context` as traveler facts, constraints, preferences, timing, budget, companions, travel history, and other useful context. `selected_option`, when present, is deterministic selection context.
 
@@ -58,7 +66,9 @@ Meridian reads `trip_state.matcher_state` for matcher continuity: previous recom
 
 ```mermaid
 flowchart TB
-    Input["Receive trip_context<br/>and matcher_state"]
+    Input["Receive trip_context + prior-advice context<br/>matcher_state + current message"]
+    Continue{"Persisted awaiting<br/>or refinement context?"}
+    Apply["Interpret message as the active<br/>clarification or refinement turn"]
     Read["Read all material traveler context<br/>preferences · constraints · timing<br/>budget · companions · history"]
     Exclusions["Preserve hard exclusions<br/>and explicit preferences"]
     Enough{"Would recommendations be<br/>useful without misleading<br/>the traveler?"}
@@ -81,7 +91,10 @@ flowchart TB
     Explain["Build why_ranked_here<br/>matches · trade-offs · sections"]
     Output["Return message + state_delta<br/>status + options"]
 
-    Input --> Read --> Exclusions --> Enough
+    Input --> Continue
+    Continue -->|Yes| Apply --> Read
+    Continue -->|No| Read
+    Read --> Exclusions --> Enough
     Enough -->|No| Clarify --> Output
     Enough -->|Yes| Evaluate --> CurrentFacts
     CurrentFacts -->|Yes| Verify --> Viable
@@ -120,11 +133,12 @@ Meridian always returns valid JSON:
   },
   "status": "NEEDS_CLARIFICATION | SUCCESS | SOFT_FAIL | HARD_FAIL | BUDGET_FAIL | CONFLICT_FAIL",
   "generated_at": "ISO-8601 timestamp",
-  "version": "matcher_v2",
   "trip_type": "single | circuit | mixed | null",
   "options": []
 }
 ```
+
+For supported failure outcomes, Meridian may additionally return non-empty `constraint_adjustment_suggestions`. The field is omitted for `SUCCESS`, `NEEDS_CLARIFICATION`, and whenever no useful adjustment exists. It is never returned as `null`.
 
 Meridian must not return:
 
@@ -224,6 +238,8 @@ Meridian should not fabricate current data.
 ## Stage Ownership
 
 Meridian does not write `stage`.
+
+While the status is `NEEDS_CLARIFICATION`, the UI keeps `active_agent = meridian` and sends the next matching turn directly to Meridian. For every terminal business status, the UI clears the active specialist and decides the next screen or action.
 
 UI stage handling:
 
