@@ -26,7 +26,7 @@ flowchart LR
     Traveler["Traveler"] --> UI["UI dispatcher<br/>owns stage + active_agent"]
     UI -->|new journey, entry, advice| Scout["Scout<br/>preserve context<br/>answer advice + route"]
     Scout -->|intent = matcher| UI
-    UI -->|deep-merged phase slice<br/>+ current message| Meridian["Meridian<br/>evaluate readiness<br/>clarify + reason + match"]
+    UI -->|deep-merged phase slice<br/>+ current message| Meridian["Meridian<br/>address ask + evaluate readiness<br/>clarify + reason + match"]
     Meridian -->|NEEDS_CLARIFICATION| UI
     UI -->|next matching message directly| Meridian
     Meridian -->|terminal business outcome| UI
@@ -36,7 +36,7 @@ flowchart LR
     Traveler -->|new journey| Reset["UI resets active_agent to Scout"] --> UI
 ```
 
-Scout is invoked only while Scout owns the conversation. It preserves all material traveler-provided context and answers general advice without performing recommendation work. Meridian owns recommendation readiness, clarification, constraint accounting, feasibility, and refinement after handoff. A terminal Meridian outcome returns lifecycle control to the UI; it does not route the completed turn back through Scout.
+Scout is invoked only while Scout owns the conversation. It preserves each useful extracted value verbatim under a semantic key and answers general advice without performing recommendation work. After handoff, Meridian addresses the current matching ask from known context, asks one material clarification only when required, recommends after the answer when ready, and owns constraint accounting, feasibility, and refinement. A terminal Meridian outcome returns lifecycle control to the UI; it does not route the completed turn back through Scout.
 
 Each feature:
 
@@ -125,9 +125,9 @@ Scout returns deltas for:
 trip_context
 ```
 
-Scout receives `stage`, `trip_context`, and `advisor_state`, plus the current user message. It extracts specific reusable traveler signals directly under `trip_context`, preserves distinctions and qualifiers that affect later decisions, returns only new or updated context fields in `state_delta`, and returns routing through top-level `intent`. It does not copy the full query into context or write lifecycle/operational state.
+Scout receives `stage`, `trip_context`, and `advisor_state`, plus the current user message. It extracts specific reusable traveler signals directly under `trip_context`, preserves each value verbatim with distinctions and qualifiers that affect later decisions, returns only new or updated context fields in `state_delta`, and returns routing through top-level `intent`. It does not copy the full query into context or write lifecycle/operational state.
 
-Meridian receives `trip_context`, the minimal read-only `advisor_state.conversation_context.last_advisor_message`, `matcher_state`, and the current traveler `message`. It evaluates readiness without a universal field checklist, asks one material clarification when required, and keeps recommendation constraints, assumptions, trade-offs, and circuit feasibility explicit. It does not receive `trip_id`, `status`, `stage`, `planner_state`, or UI-owned lifecycle fields. Meridian returns a traveler-facing matcher `message`, a business `status`, an agent-owned `state_delta`, and optional recommendation output.
+Meridian receives `trip_context`, the minimal read-only `advisor_state.conversation_context.last_advisor_message`, `matcher_state`, and the current traveler `message`. It addresses the current matching ask from known context, evaluates readiness without a universal field checklist, asks one material clarification when required, and recommends after the answer when ready. Its recommendation output uses `why_ranked_here` as **Why this works for you** and keeps constraints, assumptions, trade-offs, and circuit feasibility explicit. It does not receive `trip_id`, `status`, `stage`, `planner_state`, or UI-owned lifecycle fields. Meridian returns a traveler-facing matcher `message`, a business `status`, an agent-owned `state_delta`, and optional recommendation output.
 
 Neither agent currently has curated grounding or live verification. Time-sensitive guidance must be qualified and direct the traveler to relevant current checks rather than presenting unverified claims as current facts.
 

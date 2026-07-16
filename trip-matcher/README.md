@@ -10,7 +10,9 @@ Trip Matcher currently:
 
 - interprets open-ended `trip_context` without requiring a fixed form;
 - uses `matcher_state` for clarification and recommendation continuity;
+- addresses the current matching ask from known context before asking for anything else;
 - asks exactly one material clarification when an answer would materially change feasibility, ranking, or the recommendation;
+- recommends after the traveler answers when the context is ready;
 - returns up to three ranked destination or circuit options when useful;
 - accounts for material traveler constraints, assumptions, matches, mismatches, trade-offs, and circuit feasibility;
 - returns expected business-failure outcomes when constraints prevent a clean recommendation.
@@ -30,7 +32,7 @@ flowchart TB
     Invalid["Reject invalid status<br/>Do not merge or store output"]
     Merge["UI merges state_delta<br/>and preserves TripState"]
     Status{"Meridian status"}
-    Clarify["NEEDS_CLARIFICATION<br/>Show one material question<br/>Keep stage = matching"]
+    Clarify["NEEDS_CLARIFICATION<br/>Useful guidance + one material question<br/>Keep stage = matching"]
     Answer["Traveler answers or refines<br/>UI routes directly to active Meridian"]
     Recommendation["SUCCESS<br/>Store recommendation history<br/>Set stage = recommended"]
     Cards["Render ranked option cards<br/>with matches and trade-offs"]
@@ -81,10 +83,10 @@ Traveler asks for destination options
   -> UI calls Scout because Scout owns entry
   -> Scout returns intent = matcher plus trip_context delta
   -> UI merges the delta and calls Meridian with the same message
-  -> Meridian asks one material question and sets awaiting
+  -> Meridian addresses the current ask from known context, asks one material question, and sets awaiting
   -> traveler answers briefly
   -> UI calls Meridian directly with current TripState and the new message
-  -> Meridian clears or replaces awaiting and continues matching
+  -> Meridian preserves the useful answer and recommends when ready
 ```
 
 When the traveler selects a destination or circuit, the UI writes `trip_context.selected_option` and sets the lifecycle stage to `matched`.

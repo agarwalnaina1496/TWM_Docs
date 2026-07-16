@@ -62,7 +62,7 @@ On every non-null user message, Scout should:
 ```text
 1. Read the whole message.
 2. Extract every useful trip-related signal.
-3. Preserve the traveler's wording verbatim wherever possible.
+3. Preserve each extracted value verbatim under a semantic key.
 4. Preserve distinct identities, qualifiers, comparisons, route concerns, and relationships between signals.
 5. Write only new or updated fields into state_delta.trip_context.
 6. Then route the turn and compose a response only if Scout is the visible responder.
@@ -126,7 +126,7 @@ travel history
 specific reusable detail from the ask
 ```
 
-Values should preserve the traveler's wording verbatim wherever possible. This applies to the useful extracted value, not to a wholesale copy of the user's query.
+Preserve each extracted value verbatim. This applies to the useful value under its semantic key, not to a wholesale copy of the user's query.
 
 Extraction must keep decision-relevant distinctions intact:
 

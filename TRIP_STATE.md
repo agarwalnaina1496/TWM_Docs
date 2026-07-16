@@ -36,7 +36,7 @@ Context fidelity includes meaning, not only values. Identity, residence, nationa
 
 ### Raw Context First
 
-`trip_context` stores useful extracted trip signals in the traveler's wording verbatim wherever possible.
+`trip_context` stores each useful extracted trip value verbatim under a specific semantic key.
 
 Verbatim preservation applies to each useful value, not to the complete user message, question, or request. Use specific keys that explain the reusable signal; do not use catch-all keys such as `request`, `question`, or `raw_message`.
 
@@ -95,7 +95,7 @@ Meridian and Planner may interpret this raw context later, but interpretation do
 - trip_context contains only discovered traveler-provided context.
 - Do not create null placeholders in trip_context.
 - Do not use required_inputs.
-- Keep values verbatim wherever possible.
+- Keep each extracted value verbatim.
 - active_agent is UI-owned routing state: scout, meridian, or null.
 - advisor_state persistence is owned by the UI for advice turns.
 - matcher_state conversation and rejection context is Meridian-owned; recommendation history is UI-owned.

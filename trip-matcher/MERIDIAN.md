@@ -2,7 +2,7 @@
 
 Meridian is the conversational Trip Matcher.
 
-Scout extracts traveler context and performs the initial matcher handoff. Meridian then owns the visible matching conversation: it evaluates readiness, may ask one material clarification, continues from the traveler's answer, refines prior recommendations, and returns a terminal destination/circuit outcome.
+Scout extracts traveler context and performs the initial matcher handoff. Meridian then owns the visible matching conversation: it addresses the current matching ask, evaluates readiness, may ask one material clarification, recommends after the answer when ready, refines prior recommendations, and returns a terminal destination/circuit outcome.
 
 Meridian is stateless. It receives the current payload and returns one response.
 
@@ -13,9 +13,10 @@ Meridian is stateless. It receives the current payload and returns one response.
 ```text
 - interpret open-ended trip_context
 - classify hard requirements, preferences, uncertainty, and allowed trade-offs
+- address the current matching ask using the context already known
 - decide whether the requested recommendation can be useful without a material assumption
 - ask exactly one material clarification when needed
-- generate destination/circuit options when useful
+- generate destination/circuit options immediately when ready, including after a clarification answer
 - account for every material traveler input and disclose mismatches
 - keep route and circuit feasibility internally consistent
 - return a traveler-facing message
@@ -74,9 +75,10 @@ flowchart TB
     Apply["Interpret message as the active<br/>clarification or refinement turn"]
     Read["Read all material traveler context<br/>preferences, constraints, timing<br/>budget, companions, history"]
     Classify["Classify hard requirements<br/>preferences, uncertainty<br/>and allowed trade-offs"]
+    Address["Address the current matching ask<br/>from known context"]
     Enough{"Would recommendations be<br/>useful without misleading<br/>the traveler?"}
 
-    Clarify["Give brief safe guidance<br/>ask exactly one material question<br/>NEEDS_CLARIFICATION, no options"]
+    Clarify["Give brief useful guidance<br/>ask exactly one material question<br/>NEEDS_CLARIFICATION, no options"]
     Evaluate["Evaluate every material input<br/>fit, mismatch, assumption<br/>trade-off and feasibility"]
     Circuit{"Is this a driving circuit?"}
     Feasibility["Reconcile origin, nights, legs<br/>distance, drive time and pace"]
@@ -93,13 +95,13 @@ flowchart TB
     Soft["Use SOFT_FAIL<br/>and explain the trade-offs"]
     Success["Use SUCCESS"]
     Rank["Rank up to three options"]
-    Explain["Build why_ranked_here<br/>matches, trade-offs, sections"]
+    Explain["Build Why this works for you<br/>matches, trade-offs, sections"]
     Output["Return message + state_delta<br/>status + options"]
 
     Input --> Continue
     Continue -->|Yes| Apply --> Read
     Continue -->|No| Read
-    Read --> Classify --> Enough
+    Read --> Classify --> Address --> Enough
     Enough -->|No| Clarify --> Output
     Enough -->|Yes| Evaluate --> Circuit
     Circuit -->|Yes| Feasibility --> CurrentFacts
@@ -163,17 +165,18 @@ The core response contract intentionally contains only fields the UI/orchestrati
 
 ## Clarification
 
-Evaluate readiness for the recommendation type requested; there is no universal required-field checklist. Use `NEEDS_CLARIFICATION` only when one missing or ambiguous answer would materially change feasibility, ranking, or the recommendation itself.
+Address the traveler's current matching ask using the context already known, then evaluate readiness for the recommendation type requested; there is no universal required-field checklist. Use `NEEDS_CLARIFICATION` only when one missing or ambiguous answer would materially change feasibility, ranking, or the recommendation itself.
 
 Rules:
 
 ```text
-- give brief safe guidance from the known context
+- give brief useful guidance from the known context
 - ask exactly one concise, targeted question
 - keep options empty
 - set conversation_context.awaiting to the one missing decision
 - do not block merely because a form-like field is absent
 - do not repeat a question whose answer is already available
+- after an awaited answer, preserve the useful context and recommend when ready
 ```
 
 Missing origin, exact budget, or exact duration should not automatically block recommendations if the traveler gave enough direction. Conversely, Meridian must not silently assume a missing origin, starting point, budget boundary, or other fact when that fact materially affects the requested recommendation.
@@ -218,9 +221,9 @@ Options keep the UI-compatible shape:
 
 The chat `message` should be a concise shortlist summary, not a duplicate of the option cards. The structured `options` let the UI render review cards and selection controls.
 
-`why_ranked_here` is required for every option. It explains why this option has this rank, not just why the destination is generally good.
+`why_ranked_here` is required for every option and is the traveler-specific **Why this works for you** explanation. It covers every material satisfied traveler input, not just why the destination is generally good.
 
-Build `why_ranked_here`, `decision_summary.matches`, and `decision_summary.tradeoffs` from every material traveler input. Each input must influence ranking, appear as a satisfied match, be disclosed as a mismatch or uncertainty, or be addressed in an appropriate section. Preserve budget inclusions and exclusions exactly as supplied. When the traveler is already considering options, compare the recommendations against those choices using the requested decision factors.
+Build `why_ranked_here`, `decision_summary.matches`, and `decision_summary.tradeoffs` from every material traveler input. Use `decision_summary.matches` as a concise checklist of satisfied requirements and preferences. Put every material mismatch, uncertainty, practical cost, and allowed trade-off in `decision_summary.tradeoffs`. Supporting sections add detail but do not replace this complete accounting. Preserve budget inclusions and exclusions exactly as supplied. When the traveler is already considering options, compare the recommendations against those choices using the requested decision factors.
 
 For the same query, content depth and practical fit can appear separately. For example, "enough attractions to comfortably spend 3-4 days exploring" explains whether the destination has enough to do, while "3-4 day trip fit" explains pacing and logistics. Month/season fit should be explicit when the travel month materially changes the answer.
 
