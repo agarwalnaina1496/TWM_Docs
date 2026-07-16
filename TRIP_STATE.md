@@ -32,6 +32,8 @@ Do not create placeholder fields for information that has not been discovered.
 
 Scout adds fields only when the traveler supplies that signal. There are no predefined trip-context fields, no `required_inputs`, and no null placeholders.
 
+Context fidelity includes meaning, not only values. Identity, residence, nationality, and departure origin remain distinct. Relative language, uncertainty, flexibility, destination categories, comparison goals, route concerns, seasonal relevance, trip shape, and stated budget boundaries remain qualified and related as the traveler supplied them.
+
 ### Raw Context First
 
 `trip_context` stores useful extracted trip signals in the traveler's wording verbatim wherever possible.
@@ -56,7 +58,7 @@ Examples:
 }
 ```
 
-Meridian and Planner may interpret this raw context later.
+Meridian and Planner may interpret this raw context later, but interpretation does not authorize silently strengthening a qualifier, relaxing a hard requirement, or inventing a missing fact.
 
 ## Top-Level Shape
 
@@ -279,7 +281,7 @@ These are examples, not required fields. Scout may create any sensible key when 
 
 `conversation_context` carries only enough context for Meridian to continue a matcher clarification. It is not a conversation transcript.
 
-Meridian may update `last_meridian_message` and `awaiting` when it asks one soft clarification.
+Meridian may update `last_meridian_message` and `awaiting` when it asks one material clarification.
 
 `recommendations` stores Meridian output history. Each successful Meridian response, including business failures such as `HARD_FAIL` or `BUDGET_FAIL`, is appended to this array.
 
@@ -312,7 +314,7 @@ The semantic contract should not change when storage moves from localStorage to 
 |---|---|
 | TripState created | `new` |
 | UI handles Scout's validated Matcher handoff | `matching` |
-| Meridian asks a soft clarification | `matching` |
+| Meridian asks one material clarification | `matching` |
 | Meridian recommendation/failure output is returned to UI | `recommended` |
 | User refines recommendations after `recommended` | `matching` |
 | Destination or circuit confirmed | `matched` |

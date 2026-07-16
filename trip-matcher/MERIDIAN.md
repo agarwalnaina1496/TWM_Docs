@@ -2,7 +2,7 @@
 
 Meridian is the conversational Trip Matcher.
 
-Scout extracts traveler context and performs the initial matcher handoff. Meridian then owns the visible matching conversation: it may ask one useful clarification, continue from the traveler's answer, refine prior recommendations, or return a terminal destination/circuit outcome.
+Scout extracts traveler context and performs the initial matcher handoff. Meridian then owns the visible matching conversation: it evaluates readiness, may ask one material clarification, continues from the traveler's answer, refines prior recommendations, and returns a terminal destination/circuit outcome.
 
 Meridian is stateless. It receives the current payload and returns one response.
 
@@ -12,9 +12,12 @@ Meridian is stateless. It receives the current payload and returns one response.
 
 ```text
 - interpret open-ended trip_context
-- decide whether destination-level recommendations can be useful now
-- ask at most one soft clarification when needed
+- classify hard requirements, preferences, uncertainty, and allowed trade-offs
+- decide whether the requested recommendation can be useful without a material assumption
+- ask exactly one material clarification when needed
 - generate destination/circuit options when useful
+- account for every material traveler input and disclose mismatches
+- keep route and circuit feasibility internally consistent
 - return a traveler-facing message
 - return state_delta so the UI can deep-merge matcher context
 - preserve UI-compatible recommendation payloads
@@ -56,7 +59,7 @@ Meridian receives:
 
 Meridian reads the open-ended fields in `trip_state.trip_context` as traveler facts, constraints, preferences, timing, budget, companions, travel history, and other useful context. `selected_option`, when present, is deterministic selection context.
 
-The matcher reads whatever Scout preserved, including arrays and nested objects. Traveler wording is treated as evidence and should not be normalized unless Meridian needs an internal interpretation.
+The matcher reads whatever Scout preserved, including arrays and nested objects. Traveler wording is evidence: hard requirements remain hard, preferences may be traded off only when disclosed, and uncertainty or relative language remains qualified.
 
 Meridian reads `trip_state.matcher_state` for matcher continuity: previous recommendations, rejected options, and the current matcher clarification state.
 
@@ -69,14 +72,16 @@ flowchart TB
     Input["Receive trip_context + prior-advice context<br/>matcher_state + current message"]
     Continue{"Persisted awaiting<br/>or refinement context?"}
     Apply["Interpret message as the active<br/>clarification or refinement turn"]
-    Read["Read all material traveler context<br/>preferences · constraints · timing<br/>budget · companions · history"]
-    Exclusions["Preserve hard exclusions<br/>and explicit preferences"]
+    Read["Read all material traveler context<br/>preferences, constraints, timing<br/>budget, companions, history"]
+    Classify["Classify hard requirements<br/>preferences, uncertainty<br/>and allowed trade-offs"]
     Enough{"Would recommendations be<br/>useful without misleading<br/>the traveler?"}
 
-    Clarify["Ask exactly one material question<br/>status = NEEDS_CLARIFICATION<br/>options = empty"]
-    Evaluate["Evaluate destination-level fit<br/>season · duration · reachability<br/>budget · pace · group context"]
-    CurrentFacts{"Are time-sensitive facts<br/>material to the answer?"}
-    Verify["Verify with available tools<br/>or add a booking-time caveat"]
+    Clarify["Give brief safe guidance<br/>ask exactly one material question<br/>NEEDS_CLARIFICATION, no options"]
+    Evaluate["Evaluate every material input<br/>fit, mismatch, assumption<br/>trade-off and feasibility"]
+    Circuit{"Is this a driving circuit?"}
+    Feasibility["Reconcile origin, nights, legs<br/>distance, drive time and pace"]
+    CurrentFacts{"Do time-sensitive facts<br/>lack verified current evidence?"}
+    Qualify["Qualify the claim and recommend<br/>relevant near-departure checks"]
     Viable{"Are there viable options?"}
 
     FailureCause{"What prevents<br/>a viable match?"}
@@ -88,16 +93,18 @@ flowchart TB
     Soft["Use SOFT_FAIL<br/>and explain the trade-offs"]
     Success["Use SUCCESS"]
     Rank["Rank up to three options"]
-    Explain["Build why_ranked_here<br/>matches · trade-offs · sections"]
+    Explain["Build why_ranked_here<br/>matches, trade-offs, sections"]
     Output["Return message + state_delta<br/>status + options"]
 
     Input --> Continue
     Continue -->|Yes| Apply --> Read
     Continue -->|No| Read
-    Read --> Exclusions --> Enough
+    Read --> Classify --> Enough
     Enough -->|No| Clarify --> Output
-    Enough -->|Yes| Evaluate --> CurrentFacts
-    CurrentFacts -->|Yes| Verify --> Viable
+    Enough -->|Yes| Evaluate --> Circuit
+    Circuit -->|Yes| Feasibility --> CurrentFacts
+    Circuit -->|No| CurrentFacts
+    CurrentFacts -->|Yes| Qualify --> Viable
     CurrentFacts -->|No| Viable
 
     Viable -->|No| FailureCause
@@ -156,18 +163,20 @@ The core response contract intentionally contains only fields the UI/orchestrati
 
 ## Clarification
 
-Use `NEEDS_CLARIFICATION` only when one missing answer would materially change the destination-level recommendation.
+Evaluate readiness for the recommendation type requested; there is no universal required-field checklist. Use `NEEDS_CLARIFICATION` only when one missing or ambiguous answer would materially change feasibility, ranking, or the recommendation itself.
 
 Rules:
 
 ```text
-- ask exactly one concise question
+- give brief safe guidance from the known context
+- ask exactly one concise, targeted question
 - keep options empty
 - set conversation_context.awaiting to the one missing decision
 - do not block merely because a form-like field is absent
+- do not repeat a question whose answer is already available
 ```
 
-Missing origin, exact budget, or exact duration should not automatically block recommendations if the traveler gave enough direction.
+Missing origin, exact budget, or exact duration should not automatically block recommendations if the traveler gave enough direction. Conversely, Meridian must not silently assume a missing origin, starting point, budget boundary, or other fact when that fact materially affects the requested recommendation.
 
 ---
 
@@ -211,7 +220,7 @@ The chat `message` should be a concise shortlist summary, not a duplicate of the
 
 `why_ranked_here` is required for every option. It explains why this option has this rank, not just why the destination is generally good.
 
-Build `why_ranked_here`, `decision_summary.matches`, and `decision_summary.tradeoffs` from material `trip_context` fields such as duration, travel month/season, budget, origin/reachability, companions/group type, crowd preference, and weather preference. Every useful field Meridian receives should be considered somewhere in ranking, matches, tradeoffs, sections, or option reasoning.
+Build `why_ranked_here`, `decision_summary.matches`, and `decision_summary.tradeoffs` from every material traveler input. Each input must influence ranking, appear as a satisfied match, be disclosed as a mismatch or uncertainty, or be addressed in an appropriate section. Preserve budget inclusions and exclusions exactly as supplied. When the traveler is already considering options, compare the recommendations against those choices using the requested decision factors.
 
 For the same query, content depth and practical fit can appear separately. For example, "enough attractions to comfortably spend 3-4 days exploring" explains whether the destination has enough to do, while "3-4 day trip fit" explains pacing and logistics. Month/season fit should be explicit when the travel month materially changes the answer.
 
@@ -225,13 +234,17 @@ Do not return `match_sections`, `why_this_works_for_you`, `final_recommendation`
 explicit traveler preference > system defaults > fallback heuristics
 ```
 
-Hard exclusions are absolute.
+Hard requirements, exclusions, and feasibility limits cannot be silently relaxed. Preferences may be traded off only when the mismatch is visible and justified. Uncertainty and relative language remain qualified.
 
 Budget, season, crowd, weather, trip purpose, travel history, and current concerns should be interpreted from the open context rather than forced into required fields.
 
-If live facts matter, such as current closures, visa rules, weather disruption, or transport prices, Meridian should verify with available tools or caveat that the fact needs checking closer to booking.
+Live verification is not currently available. If current closures, visa rules, weather disruption, transport status, prices, or other time-sensitive facts materially affect the answer, Meridian must present only qualified seasonal or general guidance and recommend the relevant current checks near departure or booking. Meridian must not fabricate current data or present memory as a verified current fact.
 
-Meridian should not fabricate current data.
+---
+
+## Circuit Feasibility
+
+For every driving circuit, Meridian confirms the starting point when it materially affects feasibility, fits allocated nights within the total duration, and accounts for every driving leg. Leg distances and drive times must reconcile with route totals, daily averages, driving-day count, and the stated pace. Long transfers and seasonally relevant disruption exposure remain visible trade-offs. If the required input or arithmetic does not support a responsible circuit, Meridian clarifies or returns fewer options instead of forcing a route.
 
 ---
 

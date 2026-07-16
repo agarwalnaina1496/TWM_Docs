@@ -10,9 +10,9 @@ Trip Matcher currently:
 
 - interprets open-ended `trip_context` without requiring a fixed form;
 - uses `matcher_state` for clarification and recommendation continuity;
-- asks at most one useful clarification when an answer would materially change the recommendation;
+- asks exactly one material clarification when an answer would materially change feasibility, ranking, or the recommendation;
 - returns up to three ranked destination or circuit options when useful;
-- explains important matches and tradeoffs;
+- accounts for material traveler constraints, assumptions, matches, mismatches, trade-offs, and circuit feasibility;
 - returns expected business-failure outcomes when constraints prevent a clean recommendation.
 
 ## Request Flow
