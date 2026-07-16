@@ -53,7 +53,7 @@ Rules:
 ```text
 - UI accepts only Scout-owned `state_delta.trip_context` fields and deep-merges them into TripState.
 - Store every extracted traveler signal directly under trip_context using a specific, meaningful key.
-- Preserve useful extracted values verbatim where possible, but do not copy the complete user query into context.
+- Preserve each useful extracted value verbatim under a semantic key, but do not copy the complete user query into context.
 - Preserve distinctions and qualifiers that materially affect advice or matching; do not infer adjacent traveler facts.
 - Do not use generic catch-all keys such as request, question, or raw_message.
 - Scout should not return required_inputs or a fixed preferences schema.
@@ -110,7 +110,7 @@ message, when a traveler turn is present
 
 On initial handoff, UI first merges Scout's traveler-context delta and then builds this request. On continuation, `message` is the new clarification or refinement turn and Scout is not called again.
 
-Meridian evaluates readiness for the requested recommendation rather than enforcing a universal required-field list. Behavioral rules for one-material-question clarification, constraint accounting, explicit assumptions, traveler-specific trade-offs, and circuit feasibility are canonical in [Meridian](MERIDIAN.md).
+Meridian first addresses the current matching ask using known context, then evaluates readiness for the requested recommendation rather than enforcing a universal required-field list. When one material clarification is required, it gives brief useful guidance and asks exactly one targeted question; after the answer, it recommends when ready. Constraint accounting, explicit assumptions, traveler-specific trade-offs, and circuit feasibility are canonical in [Meridian](MERIDIAN.md).
 
 Response:
 
@@ -152,7 +152,7 @@ Response:
 }
 ```
 
-`why_ranked_here` is required for every recommendation option. It explains why this option has this rank for this traveler. Every material input must influence ranking, appear as a match, be disclosed as a mismatch or uncertainty, or be addressed in an appropriate section. Hard requirements cannot be silently relaxed, and stated budget inclusions and exclusions remain intact.
+`why_ranked_here` is required for every recommendation option and is its traveler-specific **Why this works for you** explanation. It covers every material satisfied traveler input. `decision_summary.matches` lists satisfied requirements and preferences, while `decision_summary.tradeoffs` discloses every material mismatch, uncertainty, practical cost, and allowed trade-off. Supporting sections do not replace this accounting. Hard requirements cannot be silently relaxed, and stated budget inclusions and exclusions remain intact.
 
 Meridian should not return `match_sections`, `why_this_works_for_you`, `final_recommendation`, or `refinement_hooks` in the current contract.
 
