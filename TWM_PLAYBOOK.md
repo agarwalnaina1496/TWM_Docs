@@ -2,7 +2,7 @@
 
 Trip Matcher/Planner is a single conversational system responsible for helping a traveler decide **where to go** and, eventually, **plan the trip**. Advise, Matcher, and Planner are independent phases - which one runs depends entirely on what the traveler is actually asking in a given turn. There is no forced pipeline and no fixed sequence.
 
-The traveler experiences this as one chat window. Internally, Scout routes the turn to Advise, Matcher, or Planner; the UI deep-merges the returned `state_delta` into `TripState`.
+The traveler experiences this as one chat window. Internally, the UI dispatches each turn to the current owner. Scout routes entry/advice turns; after handoff, Meridian owns matching clarification and refinement until a terminal outcome. The UI validates and deep-merges only the responding agent's owned delta.
 
 There is no fixed Knowledge Base. The system reasons directly from what the traveler says, plus live data lookups (search, cost, feasibility) when something time-sensitive needs verifying. It does not invent time-sensitive facts (weather, prices, seasonal closures, safety) from memory alone.
 
@@ -24,7 +24,7 @@ These are two distinct concepts and should never be conflated.
 **Phase Transition** - happens only when the current phase is complete:
 - Advise complete -> Matcher and/or Planner can be offered, depending on the actual query.
 - Matcher complete (destination **decided/confirmed by the traveler**, not merely suggested) -> Planner triggers ("want a day-by-day plan for this?")
-- These CTAs trigger internal routing. The traveler stays on the same chat screen - only the system's active phase changes.
+- UI actions and validated handoff signals trigger routing. The traveler stays in one conversation while the UI changes the active owner or lifecycle presentation.
 
 ---
 
@@ -82,6 +82,7 @@ If the query was fully self-contained with nothing further to offer (e.g. local 
   "trip_id": "string",
   "status": "free",
   "stage": "new | matching | recommendation_ready | recommended | matched | planning | planned",
+  "active_agent": "scout | meridian | null",
   "trip_context": {},
   "advisor_state": {
     "conversation_context": {
@@ -106,11 +107,11 @@ Ownership rules:
 - `trip_context` is shared, open-ended traveler context. Every extracted signal is stored directly under it using a specific, meaningful key.
 - Scout writes only new or updated traveler-provided fields to `state_delta.trip_context`.
 - Scout owns the top-level response `message` and routing `intent`; it does not write lifecycle or operational state.
-- UI stores the full app TripState and deep-merges Scout's `trip_context` delta. Agent requests are slices, not the full app state.
+- UI stores the full app TripState, owns `stage` and `active_agent`, and applies source-aware deep merges. Agent requests are slices, not the full app state.
 - For `intent = "advise"`, UI stores the visible Scout `message` deterministically in `advisor_state` and creates the advice artifact with timestamp and agent provenance.
 - Scout receives `stage`, `trip_context`, `advisor_state`, and the latest `message`.
-- Meridian receives `trip_context`, optional `trip_context.selected_option`, and `matcher_state`.
-- Meridian owns `matcher_state` and the visible matcher reply.
+- Meridian receives `trip_context`, minimal read-only prior-advice context, `matcher_state`, and the current traveler `message`.
+- Meridian owns the visible matching conversation, `matcher_state.conversation_context`, and rejection context until a terminal outcome. UI owns recommendation history.
 - Planner will own `planner_state`; for now the UI shows a coming-soon message.
 
 Scout response envelope:
@@ -159,7 +160,9 @@ Resume behavior:
 
 - My Trips shows only a compact trip card and context chips, not saved advice content.
 - Resume chat shows a context card first.
-- Then it restores the active memory: planner coming-soon for `planning`, latest advisor advice from `advisor_state`, or matcher context from `matcher_state`.
+- Then it restores the UI-owned active phase: Meridian context first when `active_agent = meridian`, Planner coming-soon for `planning`, or the latest Scout advice for a Scout-owned entry/advice conversation.
+- A retryable infrastructure failure preserves valid state and the current owner; retry resends the exact turn without duplicating the traveler message.
+- A new journey clears pending retry state and resets ownership to Scout.
 
 ---
 
@@ -202,7 +205,7 @@ If, honestly, nothing fits well, say so plainly rather than force-fitting a weak
 
 A shortlist without a confirmed pick is conversation progression, not phase completion. Matcher is only complete once the traveler confirms a single destination - only then does the Planner phase-transition CTA apply.
 
-**5. Repeat** - Every new traveler reply goes through this cycle again. Facts carry forward; sufficiency is re-evaluated fresh each turn. Something not worth asking earlier may become worth asking once a direction is chosen.
+**5. Repeat** - After Scout hands matching to Meridian, every later clarification or refinement reply goes directly from UI to Meridian. Facts and `conversation_context.awaiting` carry forward; sufficiency is re-evaluated each turn. `NEEDS_CLARIFICATION` keeps Meridian active, while a terminal business outcome returns lifecycle control to UI.
 
 ---
 

@@ -4,9 +4,9 @@ This document describes the general architecture. It is intentionally platform-a
 
 ## Design Philosophy
 
-TWM features are independent, stateless product surfaces.
+TWM features are independent product surfaces connected by UI-owned lifecycle state.
 
-Trip Matcher and Trip Planner do not need to know about each other. They do not call each other, and there is no product-level orchestrator that enforces a sequence between them.
+Trip Matcher and Trip Planner do not call each other. The UI is the product-level dispatcher: it owns lifecycle sequence, the active conversational owner, persistence, and navigation.
 
 The user decides how far they go:
 
@@ -17,7 +17,26 @@ The user decides how far they go:
 - sequencing lives in the UI and the user's intent, not in feature coupling
 ```
 
-What connects the product is shared state: [TripState](TRIP_STATE.md).
+What connects the product is shared state and UI-owned phase routing: [TripState](TRIP_STATE.md).
+
+## Conversation Ownership and Dispatch
+
+```mermaid
+flowchart LR
+    Traveler["Traveler"] --> UI["UI dispatcher<br/>owns stage + active_agent"]
+    UI -->|new journey, entry, advice| Scout["Scout<br/>extract + route + advise"]
+    Scout -->|intent = matcher| UI
+    UI -->|deep-merged phase slice<br/>+ current message| Meridian["Meridian<br/>clarify + refine + match"]
+    Meridian -->|NEEDS_CLARIFICATION| UI
+    UI -->|next matching message directly| Meridian
+    Meridian -->|terminal business outcome| UI
+    UI -->|selection/navigation/next action| Traveler
+    UI -->|planner intent or action| Placeholder["Planner unavailable<br/>UI coming-soon placeholder"]
+    UI -->|retryable infrastructure failure<br/>preserve state and owner| Traveler
+    Traveler -->|new journey| Reset["UI resets active_agent to Scout"] --> UI
+```
+
+Scout is invoked only while Scout owns the conversation. Meridian owns matching after handoff, including short clarification answers and recommendation refinement. A terminal Meridian outcome returns lifecycle control to the UI; it does not route the completed turn back through Scout.
 
 Each feature:
 
@@ -89,7 +108,7 @@ PLACEHOLDER
 
 ### Scout / Trip Matcher
 
-Scout is the single conversational entry point. It extracts raw trip context, routes the current turn, and answers advice turns. Matcher turns are routed to Meridian, which owns the visible matcher reply.
+Scout is the conversational entry point for a new journey and for Scout-owned advice. It extracts raw trip context and returns a handoff intent. Matcher turns are handed to Meridian, which owns the visible matching conversation until a terminal outcome.
 
 Details live in [Trip Matcher](trip-matcher/README.md), [Scout](trip-matcher/SCOUT.md), and [Meridian](trip-matcher/MERIDIAN.md).
 
@@ -108,19 +127,20 @@ trip_context
 
 Scout receives `stage`, `trip_context`, and `advisor_state`, plus the current user message. It extracts specific reusable traveler signals directly under `trip_context`, returns only new or updated context fields in `state_delta`, and returns routing through top-level `intent`. It does not copy the full query into context or write lifecycle/operational state.
 
-Meridian receives `trip_context`, optional `trip_context.selected_option`, and `matcher_state`. It does not receive `trip_id`, `status`, `stage`, `advisor_state`, `planner_state`, or the raw user message. Meridian returns a traveler-facing matcher `message`, a `state_delta`, and recommendation output for UI storage in:
+Meridian receives `trip_context`, the minimal read-only `advisor_state.conversation_context.last_advisor_message`, `matcher_state`, and the current traveler `message`. It does not receive `trip_id`, `status`, `stage`, `planner_state`, or UI-owned lifecycle fields. Meridian returns a traveler-facing matcher `message`, a business `status`, an agent-owned `state_delta`, and optional recommendation output.
 
 ```text
 matcher_state.conversation_context
-matcher_state.recommendations
+matcher_state.rejected_options
 ```
 
-The UI owns deterministic matcher state writes:
+The UI owns deterministic lifecycle and history writes:
 
 ```text
 stage
+active_agent
 selected destination / option
-matcher_state.rejected_options
+matcher_state.recommendations
 ```
 
 For Scout advice turns, the UI also stores the top-level visible `message` in `advisor_state`, creates the advice artifact and timestamp, and preserves Scout agent provenance. Scout reads this UI-owned memory on useful follow-up or resume turns.
@@ -230,7 +250,7 @@ FastAPI talks to the current implementation through a stable `AgentEngine` inter
 
 ```text
 AgentEngine.scout(trip_state, message)
-AgentEngine.meridian(trip_state)
+AgentEngine.meridian(trip_state, message)
 ```
 
 The selected implementation is controlled by:
@@ -318,13 +338,7 @@ GitHub YAML files
 The KB database does not need to run on the backend server if Supabase is used.
 ```
 
-Current EC2-specific details are in:
-
-[EC2 setup](EC2_SETUP.md)
-
-Current FastAPI Render details are in:
-
-[Render FastAPI deployment](RENDER_FASTAPI.md)
+Deployment setup and backend runtime operations are documented in the `TravelWithMe` backend repository.
 
 ## Future Orchestration Layer scope
 
