@@ -95,8 +95,9 @@ flowchart TB
     Soft["Use SOFT_FAIL<br/>and explain the trade-offs"]
     Success["Use SUCCESS"]
     Rank["Rank up to three options"]
-    Explain["Build Why this works for you<br/>matches, trade-offs, sections"]
-    Output["Return message + state_delta<br/>status + options"]
+    Criteria["Define traveler criteria once<br/>with source TripContext paths"]
+    Explain["Evaluate every option against<br/>every traveler criterion"]
+    Output["Return message + state_delta<br/>status + traveler_criteria + options"]
 
     Input --> Continue
     Continue -->|Yes| Apply --> Read
@@ -117,7 +118,7 @@ flowchart TB
     Viable -->|Yes| Tradeoffs
     Tradeoffs -->|Yes| Soft --> Rank
     Tradeoffs -->|No| Success --> Rank
-    Rank --> Explain --> Output
+    Rank --> Criteria --> Explain --> Output
 ```
 
 The flow is destination-level only. Meridian does not create an itinerary, write lifecycle `stage`, or select an option on the traveler's behalf. When the response reaches the UI, the UI owns lifecycle transitions, recommendation storage, and deterministic selection.
@@ -194,40 +195,50 @@ options = up to three recommendation options when viable
 state_delta = only new matcher-derived context
 ```
 
-Options keep the UI-compatible shape:
+The recommendation response defines each material ask once in top-level `traveler_criteria`. Every option then references and evaluates every criterion:
 
 ```json
 {
-  "rank": 1,
-  "type": "single | circuit",
-  "name": "Destination or circuit name",
-  "destination_id": "stable_destination_id_or_null",
-  "circuit_id": "stable_circuit_id_or_null",
-  "best_for": "who this option is best for / why this rank makes sense",
-  "why_ranked_here": ["string"],
-  "decision_summary": {
-    "matches": ["string"],
-    "tradeoffs": ["string"]
-  },
-  "sections": [
+  "traveler_criteria": [
     {
-      "type": "reachability | season | budget | pace | route | stay | other",
-      "heading": "string",
-      "points": ["string"]
+      "id": "criterion_id",
+      "label": "Traveler-facing criterion label",
+      "requirement_type": "HARD | PREFERENCE",
+      "source_context_paths": ["travel_month"]
+    }
+  ],
+  "options": [
+    {
+      "rank": 1,
+      "type": "single",
+      "name": "Destination name",
+      "destination_id": "stable_destination_id",
+      "circuit_id": null,
+      "summary": "Concise option-level orientation",
+      "evaluations": [
+        {
+          "criterion_id": "criterion_id",
+          "outcome": "MATCH | TRADEOFF | MISMATCH",
+          "conclusion": "What this option means for this criterion",
+          "details": [
+            { "type": "bullets", "items": ["Supporting evidence"] }
+          ],
+          "tradeoffs": []
+        }
+      ],
+      "other_considerations": []
     }
   ]
 }
 ```
 
-The chat `message` should be a concise shortlist summary, not a duplicate of the option cards. The structured `options` let the UI render review cards and selection controls.
+The chat `message` introduces the ranking without duplicating the cards. An option `summary` briefly orients the traveler. Each evaluation `conclusion` states the option-specific answer for one criterion. Its `details` provide approved evidence as `bullets`, `facts`, or `cost_breakdown`. A `TRADEOFF` or `MISMATCH` keeps its practical costs in that evaluation's `tradeoffs`; residual facts that do not map to one criterion belong in `other_considerations`.
 
-`why_ranked_here` is required for every option and is the traveler-specific **Why this works for you** explanation. It covers every material satisfied traveler input, not just why the destination is generally good.
+Every material traveler input maps to one criterion with one or more `source_context_paths`. Criterion IDs and labels are unique, and one source path cannot belong to multiple criteria. Every option evaluates the same complete criterion set exactly once, so the UI can compare options without fixed report sections. `HARD` criteria cannot be silently relaxed or evaluated as `MISMATCH`. When the traveler is already considering options, the criteria reflect the decision factors in that ask.
 
-Build `why_ranked_here`, `decision_summary.matches`, and `decision_summary.tradeoffs` from every material traveler input. Use `decision_summary.matches` as a concise checklist of satisfied requirements and preferences. Put every material mismatch, uncertainty, practical cost, and allowed trade-off in `decision_summary.tradeoffs`. Supporting sections add detail but do not replace this complete accounting. Preserve budget inclusions and exclusions exactly as supplied. When the traveler is already considering options, compare the recommendations against those choices using the requested decision factors.
+`MATCH` has no trade-offs. `TRADEOFF` and `MISMATCH` require at least one trade-off. Missing cost data is omitted, never represented by zero. A cost block uses valid non-negative estimate ranges and one currency; it must contain at least one numeric line item or total.
 
-For the same query, content depth and practical fit can appear separately. For example, "enough attractions to comfortably spend 3-4 days exploring" explains whether the destination has enough to do, while "3-4 day trip fit" explains pacing and logistics. Month/season fit should be explicit when the travel month materially changes the answer.
-
-Do not return `match_sections`, `why_this_works_for_you`, `final_recommendation`, or `refinement_hooks` in the current contract.
+The response contains no option-level verdict, note block, fixed report section, or suggested itinerary. Superseded fields such as `best_for`, `why_ranked_here`, `decision_summary`, and `sections` are not part of the contract.
 
 ---
 

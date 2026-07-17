@@ -116,45 +116,100 @@ Response:
 
 ```json
 {
-  "message": "traveler-facing matcher reply",
+  "message": "Here are the strongest destination matches for what matters to you.",
   "state_delta": {
     "trip_context": {},
     "matcher_state": {
       "conversation_context": {
-        "last_meridian_message": "same text as message",
-        "awaiting": "string | null"
+        "last_meridian_message": "Here are the strongest destination matches for what matters to you.",
+        "awaiting": null
       }
     }
   },
-  "status": "NEEDS_CLARIFICATION | SUCCESS | SOFT_FAIL | HARD_FAIL | BUDGET_FAIL | CONFLICT_FAIL",
-  "generated_at": "ISO-8601 timestamp",
-  "trip_type": "single | circuit | mixed | null",
+  "status": "SUCCESS",
+  "generated_at": "2026-07-17T12:00:00Z",
+  "trip_type": "single",
   "agent_meta": {
     "agent": "meridian",
     "prompt_version": "string"
   },
+  "traveler_criteria": [
+    {
+      "id": "comfortable_weather",
+      "label": "Comfortable weather for the travel month",
+      "requirement_type": "PREFERENCE",
+      "source_context_paths": ["travel_month", "weather_preference"]
+    }
+  ],
   "options": [
     {
       "rank": 1,
-      "type": "single | circuit",
-      "name": "Destination or circuit name",
-      "destination_id": "stable_destination_id_or_null",
-      "circuit_id": "stable_circuit_id_or_null",
-      "best_for": "who this option is best for / why this rank makes sense",
-      "why_ranked_here": ["string"],
-      "decision_summary": {
-        "matches": ["string"],
-        "tradeoffs": ["string"]
-      },
-      "sections": []
+      "type": "single",
+      "name": "Destination name",
+      "destination_id": "stable_destination_id",
+      "circuit_id": null,
+      "summary": "Concise option-level orientation",
+      "evaluations": [
+        {
+          "criterion_id": "comfortable_weather",
+          "outcome": "TRADEOFF",
+          "conclusion": "The month is scenic but rainfall can affect outdoor flexibility.",
+          "details": [
+            {
+              "type": "facts",
+              "facts": [
+                { "label": "Season pattern", "value": "Rain is common in this period." }
+              ]
+            }
+          ],
+          "tradeoffs": ["Keep outdoor plans flexible and verify the forecast near departure."]
+        }
+      ],
+      "other_considerations": ["Weekend traffic can increase transfer time."]
     }
   ]
 }
 ```
 
-`why_ranked_here` is required for every recommendation option and is its traveler-specific **Why this works for you** explanation. It covers every material satisfied traveler input. `decision_summary.matches` lists satisfied requirements and preferences, while `decision_summary.tradeoffs` discloses every material mismatch, uncertainty, practical cost, and allowed trade-off. Supporting sections do not replace this accounting. Hard requirements cannot be silently relaxed, and stated budget inclusions and exclusions remain intact.
+`traveler_criteria` defines the material ask once at response level. Each criterion has a unique `id`, a unique traveler-facing `label`, its `HARD` or `PREFERENCE` meaning, and the TripContext paths that supplied it. A source path belongs to only one criterion. Every option must evaluate every criterion exactly once through `criterion_id`; unknown, duplicate, or missing references make the recommendation payload invalid.
 
-Meridian should not return `match_sections`, `why_this_works_for_you`, `final_recommendation`, or `refinement_hooks` in the current contract.
+The top-level `message` introduces the ranking. `summary` orients the traveler to one option. Each evaluation `conclusion` answers one criterion, `details` supplies approved `bullets`, `facts`, or `cost_breakdown` evidence, and `tradeoffs` stays attached to the affected criterion. `other_considerations` is only for residual information that does not belong to one criterion.
+
+`MATCH` forbids trade-offs. `TRADEOFF` and `MISMATCH` require them, and a `HARD` criterion cannot be a `MISMATCH`. Cost values use inclusive `minimum`/`maximum` ranges in one ISO currency. Missing numeric costs and totals are omitted rather than encoded or rendered as zero.
+
+The canonical payload has no option verdict, note block, fixed report sections, or itinerary. Superseded fields `best_for`, `why_ranked_here`, `decision_summary`, and `sections` are removed.
+
+Approved evaluation detail shapes:
+
+```json
+[
+  {
+    "type": "bullets",
+    "items": ["One concise supporting point"]
+  },
+  {
+    "type": "facts",
+    "facts": [
+      { "label": "Typical character", "value": "Misty and rain-prone in this period" }
+    ]
+  },
+  {
+    "type": "cost_breakdown",
+    "currency": "INR",
+    "items": [
+      {
+        "label": "Stay",
+        "per_person": { "minimum": 5000, "maximum": 7000 },
+        "group": { "minimum": 10000, "maximum": 14000 }
+      }
+    ],
+    "per_person_total": { "minimum": 5000, "maximum": 7000 },
+    "group_total": { "minimum": 10000, "maximum": 14000 }
+  }
+]
+```
+
+A range requires finite non-negative `minimum` and `maximum` values with `maximum >= minimum`. When both group and per-person estimates are present, the group range cannot be lower than the per-person range.
 
 Meridian may return `constraint_adjustment_suggestions` for `SOFT_FAIL`, `HARD_FAIL`, `BUDGET_FAIL`, or `CONFLICT_FAIL` when there are clear ways to adjust the ask. It is omitted for `SUCCESS`, `NEEDS_CLARIFICATION`, and whenever no useful adjustment exists; it is never `null`.
 
@@ -190,11 +245,13 @@ For matcher turns:
 Scout intent = matcher
   -> UI sets stage = matching when appropriate
   -> UI calls Meridian with current message
-  -> UI deep-merges only Meridian-owned trip_context and matcher_state delta
-  -> if status = NEEDS_CLARIFICATION, stage remains matching and active_agent remains meridian
-  -> next traveler matching turn goes directly to Meridian
-  -> otherwise UI clears active_agent, appends the terminal payload to matcher_state.recommendations, and sets stage = recommended
+  -> UI validates the business status
+  -> if status = NEEDS_CLARIFICATION, UI deep-merges the owned delta, keeps stage = matching and active_agent = meridian, and routes the next matching turn directly to Meridian
+  -> if a terminal response has options, UI validates traveler criteria and every option evaluation reference before any state mutation
+  -> for a valid terminal response, UI deep-merges the owned delta, clears active_agent, appends the payload to matcher_state.recommendations, and sets stage = recommended
 ```
+
+An invalid terminal recommendation contract is treated as an integration failure: the UI preserves the last valid TripState and saved recommendation history. Expected business failures without viable options remain valid terminal outcomes.
 
 The backend does not merge deltas for the current UI-driven flow.
 
