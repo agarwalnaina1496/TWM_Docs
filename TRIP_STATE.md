@@ -283,7 +283,7 @@ These are examples, not required fields. Scout may create any sensible key when 
 
 Meridian may update `last_meridian_message` and `awaiting` when it asks one material clarification.
 
-`recommendations` stores Meridian output history. Each successful Meridian response, including business failures such as `HARD_FAIL` or `BUDGET_FAIL`, is appended to this array.
+`recommendations` stores validated terminal Meridian output history. Recommendation entries preserve the response-level `traveler_criteria`, every option's complete criterion evaluations, the response message, agent provenance, and other terminal fields. The UI validates criterion identity and complete option references before applying the terminal delta or appending history. Expected business failures such as `HARD_FAIL` or `BUDGET_FAIL` may also be appended without viable options.
 
 Infrastructure failures such as network errors or 5xx responses are not appended to `recommendations`.
 

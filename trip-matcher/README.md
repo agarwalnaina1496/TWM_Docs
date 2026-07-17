@@ -24,7 +24,7 @@ flowchart TB
     Start["Scout returns<br/>intent = matcher"]
     Build["UI builds deep-merged Meridian phase slice<br/>trip_context + prior-advice context<br/>+ matcher_state + current message"]
     Handoff["Compact execution handoff<br/>POST /meridian → FastAPI validation<br/>n8n runs Meridian → FastAPI normalizes"]
-    Result["Meridian call result<br/>status + message + state_delta + options<br/>or a technical error"]
+    Result["Meridian call result<br/>status + message + state_delta<br/>traveler_criteria + evaluated options<br/>or a technical error"]
 
     Infrastructure{"Execution and normalized<br/>response valid?"}
     Retry["Do not merge or store output<br/>Show retry message"]
@@ -34,8 +34,8 @@ flowchart TB
     Status{"Meridian status"}
     Clarify["NEEDS_CLARIFICATION<br/>Useful guidance + one material question<br/>Keep stage = matching"]
     Answer["Traveler answers or refines<br/>UI routes directly to active Meridian"]
-    Recommendation["SUCCESS<br/>Store recommendation history<br/>Set stage = recommended"]
-    Cards["Render ranked option cards<br/>with matches and trade-offs"]
+    Recommendation["SUCCESS<br/>Validate ask-mapped comparison<br/>Store history + set recommended"]
+    Cards["Render ranked option cards<br/>with criterion outcomes"]
     Failure["SOFT_FAIL · HARD_FAIL<br/>BUDGET_FAIL · CONFLICT_FAIL<br/>Store expected business result<br/>Set stage = recommended"]
     Explain["Render explanation and optional<br/>constraint adjustment suggestions"]
     Select["Traveler selects<br/>a destination or circuit"]
@@ -61,9 +61,9 @@ For Meridian's context evaluation, clarification, ranking, and failure-classific
 
 | Owner | Responsibilities |
 | --- | --- |
-| Meridian | Interpret matcher context, own clarification/refinement until a terminal outcome, and return `message`, `status`, and agent-owned `state_delta`. |
+| Meridian | Interpret matcher context, own clarification/refinement until a terminal outcome, define traveler criteria once, and evaluate every option against every criterion. |
 | Backend | Validate the request and response contract, load the released prompt, forward execution to the configured agent engine, normalize the response, and attach trusted prompt provenance. |
-| UI | Dispatch every turn to the active owner, send only the Meridian phase slice, merge source-owned deltas, store recommendation history, render outcomes, and own lifecycle stage, active owner, retry, resume, navigation, and selection. |
+| UI | Dispatch every turn to the active owner, validate terminal recommendation references before state mutation, render the ask-mapped comparison, and own history, stage, retry, resume, refinement, navigation, and selection. |
 
 Meridian does not write `stage` or `trip_context.selected_option`. The UI owns both lifecycle progression and the traveler's final selection.
 
@@ -75,6 +75,14 @@ Meridian does not write `stage` or `trip_context.selected_option`. The UI owns b
 | `SUCCESS` | Store the response as recommendation history, set `recommended`, and render the option cards. |
 | `SOFT_FAIL`, `HARD_FAIL`, `BUDGET_FAIL`, `CONFLICT_FAIL` | Treat as a terminal business output, store the result, set `recommended`, clear the active specialist, and render the explanation and optional `constraint_adjustment_suggestions`. |
 | Infrastructure or invalid-status error | Keep the active owner and valid state, do not append recommendation history, and offer retry for the same turn. |
+
+## Recommendation review experience
+
+The response `message` introduces the ranking. The UI renders up to three compact ranked cards using only response-level `traveler_criteria` and the corresponding per-option `evaluations`. Each card shows the option summary and the `MATCH`, `TRADEOFF`, or `MISMATCH` conclusion for every criterion. Rank and outcomes establish the strongest match; there is no separate option verdict.
+
+Opening **Why this works for you** keeps the comparison visible and expands one full-width panel. The panel renders only approved bullets, facts, and valid cost breakdowns. Criterion-specific trade-offs stay beside that criterion; residual `other_considerations` appear under **Things to consider**. Missing cost estimates are omitted rather than displayed as zero.
+
+Selection is a deterministic UI write to `trip_context.selected_option` and moves the trip to `matched`. Refinement returns ownership to Meridian with persisted TripState. Refresh and resume restore the stored recommendation history, selection, lifecycle stage, provenance, and expanded recommendation state. After selection, the Planner action is UI-owned; Meridian never embeds an itinerary in destination recommendations.
 
 ## Continuation Example
 

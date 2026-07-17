@@ -48,3 +48,5 @@ stateDiagram-v2
 `recommendation_ready` remains a supported stored stage but is not part of the primary handoff path.
 
 Agents never write `stage` or `active_agent`; the UI derives both from validated handoff signals, specialist outcomes, and traveler actions.
+
+Recommendation presentation does not create a lifecycle transition. Expanding **Why this works for you**, closing it, refreshing the page, or reopening recommendation review preserves the current stage and selection. Only deterministic option selection moves `recommended` to `matched`; requesting new or refined options returns the trip to `matching` and makes Meridian active.
