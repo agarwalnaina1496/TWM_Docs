@@ -306,6 +306,10 @@ Later: database
 
 The semantic contract should not change when storage moves from localStorage to a database.
 
+### Owner isolation
+
+Every Backend `/trips` route resolves the calling guest from their session cookie and scopes all reads and writes to that guest's own trips. A trip belonging to a different guest is never returned or mutated — list, get, rename, ui-state, and command endpoints all return 404 for a trip that isn't the caller's. This isolation is enforced server-side; the UI does not need to (and must not) filter trips client-side to achieve it.
+
 ## Stage Transition Reference
 
 ### Free Zone
