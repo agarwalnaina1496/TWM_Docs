@@ -88,6 +88,8 @@ The routing order is `advise → matcher → planner`: when a turn touches multi
 ## Product Documentation
 
 - [Architecture](ARCHITECTURE.md)
+- [IP protection playbook](TWM_IP_PROTECTION_PLAYBOOK.md)
+- [Recovery playbook](TWM_RECOVERY_PLAYBOOK.md)
 - [TripState](TRIP_STATE.md)
 - [Lifecycle stage transitions](STAGE_TRANSITIONS.md)
 - [Trip Matcher](trip-matcher/README.md)
