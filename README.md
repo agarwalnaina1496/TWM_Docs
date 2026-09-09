@@ -90,5 +90,6 @@ The routing order is `advise → matcher → planner`: when a turn touches multi
 - [Architecture](ARCHITECTURE.md)
 - [TripState](TRIP_STATE.md)
 - [Lifecycle stage transitions](STAGE_TRANSITIONS.md)
+- [Booking handoff — providers & deep links](BOOKING_HANDOFF.md)
 - [Trip Matcher](trip-matcher/README.md)
 - [Trip Matcher API contracts](trip-matcher/API_CONTRACTS.md)
