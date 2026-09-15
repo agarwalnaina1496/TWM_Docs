@@ -87,20 +87,16 @@ non-binding, not a provider price.
 So for a typical non-Goa trip the stay drawer shows **two cards** (Booking.com
 + ixigo).
 
-**Decided in research but not shipped** (TWM-131 named five stay partners;
-TWM-216 kept three). Before TWM-216, every stay partner used a generic
-*guessed* search path. TWM-216 kept only the partners whose *native* URL
-shape could be confirmed and dropped the rest rather than ship guessed links:
+**Rejected outright** (TWM-131 named five stay partners; TWM-216 kept three
+whose native URL shape could be confirmed, dropped the rest rather than ship
+guessed links; Hotellook and Hostelworld were fully removed from the
+partner allowlist, base domains included, TWM-230 Increment 2b):
 
 - **Hotellook** — was intended as the *primary* stay partner: a Travelpayouts
   meta-search that already compares Booking.com / Agoda / others behind one
-  link, covering the most ground with the least UI clutter. Its base domain
-  is still wired; re-add once its search URL format is confirmed.
-- **Hostelworld** — the budget / hostel tier. Separate affiliate signup
-  (Partnerize), not done. Base domain wired.
-
-**Rejected outright:**
-
+  link. Its native search URL format was never confirmed.
+- **Hostelworld** — the budget / hostel tier. Affiliate signup (Partnerize)
+  was never completed.
 - **Trip.com** — weak India-domestic hotel coverage for the current market.
 - **Airbnb** — no affiliate programme (Airbnb Associates ended March 2021),
   regardless of older mockups that referenced it.
@@ -195,12 +191,10 @@ work for half these partners:
 | Partner | Programme | Shape | Wired? |
 |---|---|---|---|
 | Aviasales | Travelpayouts | A (`marker=`) | ✅ |
-| Hotellook | Travelpayouts | A (`marker=`) | ✅ (base domain wired; not yet a shown partner) |
 | ixigo | EarnKaro / Cuelinks | A (`affiliate_id=`) | ✅ |
 | Booking.com | Travelpayouts | **B** — Partner Links API / `tp.media` redirect, or a per-account static `aid` if one is confirmed on the real dashboard | ❌ not wired |
 | Agoda | Travelpayouts | **B** — same as Booking.com, plus a confirmed **1-day cookie window** (very short attribution) | ❌ not wired |
 | redBus | EarnKaro | **B** — "paste your link, get a profit link" wrapper; no plain static param confirmed | ❌ not wired |
-| Hostelworld | Partnerize | Unconfirmed | ❌ not signed up |
 
 Confirming Booking.com/Agoda/redBus's exact Shape-B mechanism needs the real
 Travelpayouts and EarnKaro account dashboards — public documentation
