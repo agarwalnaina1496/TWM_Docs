@@ -81,15 +81,14 @@ non-binding, not a provider price.
 | Partner | Tier | CTA | Notes / why |
 |---|---|---|---|
 | **Booking.com** | Prefilled search *(dates known)* / Destination search *(no dates)* | "Search Booking.com" | Always resolves. Native search URL is confirmed, so destination, check-in / check-out, traveller count, currency (INR), and room count (fixed at 1) prefill when known. Without dates it still opens on the destination. |
-| **Agoda** | Known-destination search | "Search Agoda" | Agoda's search needs an internal city ID, not a place name. TWM holds that metadata for **Goa only** right now — so the Agoda card appears for Goa and is **hidden for every other destination** (no fabricated search). Expanding the metadata table is the way to widen this. |
 | **ixigo** | Destination redirect | "Browse ixigo hotels" | Always resolves. India-native, trusted domestic brand, no foreign-tourist markup, and its own affiliate account. ixigo's hotel deep-link parameters were never confirmed, so it opens the destination hotel *listing* only — dates and guests are set on ixigo. |
 
-So for a typical non-Goa trip the stay drawer shows **two cards** (Booking.com
-+ ixigo).
+So the stay drawer shows **two cards** (Booking.com + ixigo) for every
+destination.
 
 **Rejected outright** (TWM-131 named five stay partners; TWM-216 kept three
 whose native URL shape could be confirmed, dropped the rest rather than ship
-guessed links; Hotellook and Hostelworld were fully removed from the
+guessed links; Hotellook, Hostelworld, and Agoda were fully removed from the
 partner allowlist, base domains included, TWM-230 Increment 2b):
 
 - **Hotellook** — was intended as the *primary* stay partner: a Travelpayouts
@@ -97,22 +96,28 @@ partner allowlist, base domains included, TWM-230 Increment 2b):
   link. Its native search URL format was never confirmed.
 - **Hostelworld** — the budget / hostel tier. Affiliate signup (Partnerize)
   was never completed.
+- **Agoda** — its search needs an internal numeric city ID, not a place
+  name. TWM held that metadata for a single hand-curated entry, Goa, and
+  hid the card everywhere else — the exact hardcoded place→ID pattern
+  this story rejected elsewhere (the original `_IXIGO_STATION_CODES`
+  table, ixigo-as-a-bus-partner). Revisit only with a real city-ID
+  resolution mechanism (e.g. if Travelpayouts' own deep-link generator
+  resolves a destination automatically — see Affiliate & tracking).
 - **Trip.com** — weak India-domestic hotel coverage for the current market.
 - **Airbnb** — no affiliate programme (Airbnb Associates ended March 2021),
   regardless of older mockups that referenced it.
 
 ### Known stay gaps
 
-- **Agoda is Goa-only** — see the table. Every other destination shows no
-  Agoda card.
 - **ixigo carries nothing** — destination listing page only, by the
   "don't guess parameters" rule.
 - **Booking.com resolves the destination itself** — TWM sends the place as a
   free-text search string, not Booking.com's internal destination ID, so
   Booking.com fuzzy-matches it. For a small town with one property it can land
   directly on that property rather than an area search. Pinning it to a
-  city / region needs a Booking.com destination-ID table (the same shape as
-  Agoda's).
+  city / region needs a Booking.com destination-ID table — the same shape of
+  problem that got Agoda dropped, so not pursued without a real resolution
+  mechanism.
 - **No flexible-date support** — for a month-precision trip TWM sends no dates
   at all; Booking.com's own "I'm flexible" month view could be prefilled
   instead once that URL format is confirmed.
@@ -193,10 +198,14 @@ work for half these partners:
 | Aviasales | Travelpayouts | A (`marker=`) | ✅ |
 | ixigo | EarnKaro / Cuelinks | A (`affiliate_id=`) | ✅ |
 | Booking.com | Travelpayouts | **B** — Partner Links API / `tp.media` redirect, or a per-account static `aid` if one is confirmed on the real dashboard | ❌ not wired |
-| Agoda | Travelpayouts | **B** — same as Booking.com, plus a confirmed **1-day cookie window** (very short attribution) | ❌ not wired |
 | redBus | EarnKaro | **B** — "paste your link, get a profit link" wrapper; no plain static param confirmed | ❌ not wired |
 
-Confirming Booking.com/Agoda/redBus's exact Shape-B mechanism needs the real
+(Agoda was dropped from the product entirely, TWM-230 Increment 2b — see
+Stay above — so it's not carried in this table anymore. Travelpayouts also
+covers it via the same Shape-B mechanism as Booking.com, plus a confirmed
+**1-day cookie window**, if it's ever revisited.)
+
+Confirming Booking.com/redBus's exact Shape-B mechanism needs the real
 Travelpayouts and EarnKaro account dashboards — public documentation
 describes the shape but not account-specific specifics (the Partner Links
 API endpoint, whether a static `aid` is issued, EarnKaro's link-generation
@@ -204,9 +213,9 @@ API if any). If it turns out to require a live wrapping call, that is a
 small new integration (a link-wrapping step at request time), not a query-
 param change — its own scoped increment.
 
-So **Booking.com and Agoda links currently carry no tracking** — the
-relationship is available but the tracked-link format isn't wired, and the
-links stay honest in the meantime.
+So **Booking.com links currently carry no tracking** — the relationship is
+available but the tracked-link format isn't wired, and the links stay
+honest in the meantime.
 
 Tracking IDs are supplied only through environment configuration — never
 committed, never typed into a chat.
