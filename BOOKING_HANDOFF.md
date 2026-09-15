@@ -177,19 +177,38 @@ ticket partner is evaluated.
 
 A redirect link carries a tracking parameter only when a real tracking ID is
 configured; otherwise it is a plain, honest link with no affiliate
-disclosure shown. Two separate affiliate relationships:
+disclosure shown. Two separate affiliate relationships.
 
-- **Travelpayouts** — one marker. The network nominally covers Aviasales,
-  Hotellook, Booking.com, and Agoda, but tracking is **wired only for
-  Aviasales and Hotellook** (the shapes confirmed during research). It is the
-  same account the live flight-price path uses.
-- **ixigo** — its own account via EarnKaro / Cuelinks, covering trains and
-  hotels (no longer flights or buses — see Transport). Separate signup,
-  separate ID.
-- **redBus, Hostelworld** — affiliate programmes exist; no tracking wired.
-  redBus's confirmed EarnKaro programme has no tracking-parameter format
-  researched yet, so its bus search link stays untracked (TWM-230 Increment
-  2 follow-up).
+**Two different wiring shapes matter here (TWM-230 Increment 2b research)** —
+confusing them is why "just wire the tracking param" undersold the real
+work for half these partners:
+
+- **Shape A — direct query-param.** The network hands you a static ID; you
+  append it yourself as a URL param on the partner's own site. Self-serve,
+  code-only, no outbound call needed.
+- **Shape B — link-wrapping.** The network requires submitting your target
+  URL *to them* (their own tool, API, or redirect domain) and they hand back
+  a tracked link. Appending a param to the partner's own URL yourself does
+  **not** earn commission here — confirmed against Travelpayouts' and
+  EarnKaro's own documentation.
+
+| Partner | Programme | Shape | Wired? |
+|---|---|---|---|
+| Aviasales | Travelpayouts | A (`marker=`) | ✅ |
+| Hotellook | Travelpayouts | A (`marker=`) | ✅ (base domain wired; not yet a shown partner) |
+| ixigo | EarnKaro / Cuelinks | A (`affiliate_id=`) | ✅ |
+| Booking.com | Travelpayouts | **B** — Partner Links API / `tp.media` redirect, or a per-account static `aid` if one is confirmed on the real dashboard | ❌ not wired |
+| Agoda | Travelpayouts | **B** — same as Booking.com, plus a confirmed **1-day cookie window** (very short attribution) | ❌ not wired |
+| redBus | EarnKaro | **B** — "paste your link, get a profit link" wrapper; no plain static param confirmed | ❌ not wired |
+| Hostelworld | Partnerize | Unconfirmed | ❌ not signed up |
+
+Confirming Booking.com/Agoda/redBus's exact Shape-B mechanism needs the real
+Travelpayouts and EarnKaro account dashboards — public documentation
+describes the shape but not account-specific specifics (the Partner Links
+API endpoint, whether a static `aid` is issued, EarnKaro's link-generation
+API if any). If it turns out to require a live wrapping call, that is a
+small new integration (a link-wrapping step at request time), not a query-
+param change — its own scoped increment.
 
 So **Booking.com and Agoda links currently carry no tracking** — the
 relationship is available but the tracked-link format isn't wired, and the
