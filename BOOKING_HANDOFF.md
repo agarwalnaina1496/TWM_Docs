@@ -8,7 +8,11 @@ out of the way.
 Sources of the decisions below: TWM-129/130/131 (trusted-action contract and
 provider research), TWM-194/197 (MVP affiliate-redirect model), TWM-216
 (stay provider capability matrix), TWM-195 (transport gateway-leg scope),
-TWM-196 (flight redirect → Aviasales), TWM-205 (activities out of scope).
+TWM-196 (flight redirect → Aviasales), TWM-205 (activities out of scope),
+TWM-230 Increment 2 (transport provider capability model — real per-partner
+deep links for train/bus, replacing the single generic ixigo redirect),
+TWM-230 Increment 2c (ixigo reinstated as a second flight SEARCH_REDIRECT
+partner, its own confirmed deep link).
 This document is the canonical record; the Linear issues are the working
 history.
 
@@ -30,19 +34,21 @@ schedules or availability.
 
 ### How prefilled a redirect actually is
 
-This varies by domain, and **only stay has a real per-partner capability
-model** today:
+This varies by domain. Stay, transport, and flight now all have a real
+per-partner capability model:
 
-- **Flight** — a live cached price when TWM can resolve one, plus an
-  Aviasales search-form redirect. The Aviasales format is confirmed, so
-  origin, destination, dates, and passengers genuinely prefill.
+- **Flight** — a live cached price when TWM can resolve one (Aviasales,
+  CHECK_PRICES), plus **two independent** SEARCH_REDIRECT options —
+  Aviasales and ixigo (TWM-230 Increment 2c) — each with its own confirmed
+  deep-link shape. Both genuinely prefill *only when both endpoints resolve
+  to IATA airport codes*; a route TWM can't resolve to real airports
+  degrades each to a plain destination search, never a fabricated prefill
+  claim.
 - **Stay** — a three-tier capability model (below), chosen per partner
   based on whether that partner's deep-link format is confirmed.
-- **Train and bus** — no capability model. The link opens the partner
-  (ixigo) carrying TWM's own generically-named parameters, which ixigo's
-  public pages do not necessarily read. In practice the traveller lands on
-  ixigo and searches from scratch. A confirmed ixigo train/bus deep-link
-  format is future work.
+- **Train and bus** — a two-tier capability model (below, TWM-230 Increment
+  2), chosen per partner based on whether the route/date resolve to that
+  partner's confirmed deep-link shape.
 
 The single rule behind every gap below: where a partner's public deep-link
 format was **not confirmed** during research, TWM does not guess parameter
@@ -56,6 +62,13 @@ ship a link that might silently break.
 | **Prefilled search** | Destination + dates + party land on the partner's own search, ready to run. |
 | **Destination search** | The partner opens on the right place; the traveller picks dates there. |
 | **Destination redirect** | The partner opens on a destination listing page; dates *and* guests are chosen on the partner site. |
+
+### Train & bus capability tiers
+
+| Tier | Meaning |
+|---|---|
+| **Prefilled search** | Origin, destination, and date land on the partner's own route search, ready to run. |
+| **Destination search** | The partner opens on a generic search surface; the traveller enters the route and date there. |
 
 ## Stay
 
@@ -71,42 +84,43 @@ non-binding, not a provider price.
 | Partner | Tier | CTA | Notes / why |
 |---|---|---|---|
 | **Booking.com** | Prefilled search *(dates known)* / Destination search *(no dates)* | "Search Booking.com" | Always resolves. Native search URL is confirmed, so destination, check-in / check-out, traveller count, currency (INR), and room count (fixed at 1) prefill when known. Without dates it still opens on the destination. |
-| **Agoda** | Known-destination search | "Search Agoda" | Agoda's search needs an internal city ID, not a place name. TWM holds that metadata for **Goa only** right now — so the Agoda card appears for Goa and is **hidden for every other destination** (no fabricated search). Expanding the metadata table is the way to widen this. |
 | **ixigo** | Destination redirect | "Browse ixigo hotels" | Always resolves. India-native, trusted domestic brand, no foreign-tourist markup, and its own affiliate account. ixigo's hotel deep-link parameters were never confirmed, so it opens the destination hotel *listing* only — dates and guests are set on ixigo. |
 
-So for a typical non-Goa trip the stay drawer shows **two cards** (Booking.com
-+ ixigo).
+So the stay drawer shows **two cards** (Booking.com + ixigo) for every
+destination.
 
-**Decided in research but not shipped** (TWM-131 named five stay partners;
-TWM-216 kept three). Before TWM-216, every stay partner used a generic
-*guessed* search path. TWM-216 kept only the partners whose *native* URL
-shape could be confirmed and dropped the rest rather than ship guessed links:
+**Rejected outright** (TWM-131 named five stay partners; TWM-216 kept three
+whose native URL shape could be confirmed, dropped the rest rather than ship
+guessed links; Hotellook, Hostelworld, and Agoda were fully removed from the
+partner allowlist, base domains included, TWM-230 Increment 2b):
 
 - **Hotellook** — was intended as the *primary* stay partner: a Travelpayouts
   meta-search that already compares Booking.com / Agoda / others behind one
-  link, covering the most ground with the least UI clutter. Its base domain
-  is still wired; re-add once its search URL format is confirmed.
-- **Hostelworld** — the budget / hostel tier. Separate affiliate signup
-  (Partnerize), not done. Base domain wired.
-
-**Rejected outright:**
-
+  link. Its native search URL format was never confirmed.
+- **Hostelworld** — the budget / hostel tier. Affiliate signup (Partnerize)
+  was never completed.
+- **Agoda** — its search needs an internal numeric city ID, not a place
+  name. TWM held that metadata for a single hand-curated entry, Goa, and
+  hid the card everywhere else — the exact hardcoded place→ID pattern
+  this story rejected elsewhere (the original `_IXIGO_STATION_CODES`
+  table, ixigo-as-a-bus-partner). Revisit only with a real city-ID
+  resolution mechanism (e.g. if Travelpayouts' own deep-link generator
+  resolves a destination automatically — see Affiliate & tracking).
 - **Trip.com** — weak India-domestic hotel coverage for the current market.
 - **Airbnb** — no affiliate programme (Airbnb Associates ended March 2021),
   regardless of older mockups that referenced it.
 
 ### Known stay gaps
 
-- **Agoda is Goa-only** — see the table. Every other destination shows no
-  Agoda card.
 - **ixigo carries nothing** — destination listing page only, by the
   "don't guess parameters" rule.
 - **Booking.com resolves the destination itself** — TWM sends the place as a
   free-text search string, not Booking.com's internal destination ID, so
   Booking.com fuzzy-matches it. For a small town with one property it can land
   directly on that property rather than an area search. Pinning it to a
-  city / region needs a Booking.com destination-ID table (the same shape as
-  Agoda's).
+  city / region needs a Booking.com destination-ID table — the same shape of
+  problem that got Agoda dropped, so not pursued without a real resolution
+  mechanism.
 - **No flexible-date support** — for a month-precision trip TWM sends no dates
   at all; Booking.com's own "I'm flexible" month view could be prefilled
   instead once that URL format is confirmed.
@@ -116,38 +130,100 @@ shape could be confirmed and dropped the rest rather than ship guessed links:
 A "Transport options" action appears on the **two gateway legs only** — the
 leg that brings the traveller into the trip and the leg that takes them out
 (TWM-195 V1 scope). Internal city-to-city legs are shown in the itinerary for
-context with no booking action. Each feasible mode is one card; the drawer
-marks a recommended mode by fixed priority (flight > drive > train > bus),
-which is a routing heuristic, not a price or quality claim.
+context with no booking action (a booking drawer for a *bookable* internal
+leg, where a gateway hub coincides with a planned stop, is TWM-230 Increment
+3 — not yet shipped). Each feasible mode gets its own card grid — one card
+per approved partner for that mode, at stay-drawer parity (TWM-230 Increment
+2). There is no "recommended mode" or "Our pick" claim on any transport
+card — modes and partners are presented as equal options.
 
-| Mode | Partner | What the traveller gets | Why this partner |
+| Mode | Partner(s) | What the traveller gets | Why this partner |
 |---|---|---|---|
-| **Flight** | Aviasales | A **live cached price** when TWM can resolve one (the CHECK_PRICES path), plus an Aviasales search-form redirect. The Aviasales format is confirmed, so origin, destination, dates, and passengers genuinely prefill. | Aviasales is TWM's integrated flight partner — same Travelpayouts account as the live-price path. |
-| **Train** | ixigo | A redirect to ixigo. The traveller enters the route and date on ixigo. | IRCTC-authorised partner, India-native, no foreign-tourist markup. IRCTC has no usable public API; unofficial scrapers are legally grey and unreliable. 12Go was dropped — real IRCTC bookings but ~30% over direct price and built for foreign tourists. |
-| **Bus** | ixigo | A redirect to ixigo, same as train. | Same reasoning as train. |
+| **Flight** | Aviasales + ixigo | Aviasales: a **live cached price** when TWM can resolve one (the CHECK_PRICES path), plus a **prefilled search-results link** (`aviasales.com/search/{IATA}{DDMM}{IATA}[{DDMM}]{passengers}`, browser-verified TWM-230 Increment 2d) when both airports resolve; otherwise a dateless pre-filled *search form* (`aviasales.com/?params=...`) or the bare homepage. ixigo: a **second, independent** prefilled search (`ixigo.com/search/result/flight?from=...&to=...&date=DDMMYYYY&...`, browser-verified TWM-230 Increment 2c) under the same airport-resolution condition; otherwise the ixigo flights landing page. | Aviasales is TWM's integrated live-price partner (same Travelpayouts account as the live-price path). ixigo has its own confirmed deep link and its own EarnKaro affiliate account — a real second option, not a live-price path. |
+| **Train** | ixigo | A **prefilled search** (`ixigo.com/trains/search-pwa/from/{code}/to/{code}/{date}`) when both stations resolve to a real IRCTC-style station code and a date is known; otherwise a plain ixigo trains search. Station codes are resolved from a bundled ~8,700-row open dataset (`twm/services/station_resolution/`, CC0-licensed `datameet/railways` data), never a hand-typed place → code table. | IRCTC-authorised partner, India-native, no foreign-tourist markup. IRCTC itself has no documented deep link (a stateful single-page app) and was dropped as a partner. |
+| **Bus** | redBus | A **prefilled search** (`redbus.in/bus-tickets/{from}-to-{to}?onward={date}`) when origin and destination are known; the onward date is added when known. | redBus's route/date URL shape was browser-verified during TWM-230 Increment 2 research — the only bus partner with a confirmed public deep link. It has a confirmed EarnKaro affiliate programme, but tracking is not yet wired (see Affiliate & tracking). |
 | **Drive** | — | Distance and estimated duration, computed by TWM. No booking action. | Nothing to book — the traveller's own vehicle or a cab arranged locally. |
-
-Train and bus redirects are **not prefilled** — the link carries TWM's own
-generic parameter names, which ixigo's pages don't necessarily read. Flight
-is the exception. There is no per-partner capability model for transport the
-way there is for stay.
 
 **Decided in research, superseded or unshipped:**
 
 - **ixigo as a flight redirect** — TWM-131 approved ixigo as a second flight
-  option. TWM-196 replaced it with the Aviasales search-form redirect (same
-  Travelpayouts account as the live price), so ixigo is no longer a flight
-  partner.
-- **redBus for buses** — verified affiliate programme (EarnKaro, ~₹150 per
-  booking). It is in the bus allowlist and its base domain is wired, but the
-  UI only ever asks for a mode, never a specific bus partner, so ixigo is
-  always the one chosen. Surfacing redBus as its own card is a follow-up.
+  option; TWM-196 replaced it with the Aviasales-only search-form redirect
+  (same Travelpayouts account as the live price) because a confirmed ixigo
+  flight deep link hadn't been researched at the time. TWM-230 Increment 2c
+  found and browser-verified one (see the table above) and reinstated
+  ixigo as a second SEARCH_REDIRECT alternative — the live CHECK_PRICES
+  price stays Aviasales-only, unchanged.
+- **ixigo as a train/bus redirect (pre-TWM-230-Increment-2)** — the original
+  MVP sent every train and bus request to ixigo carrying TWM's own
+  generically-named, unread parameters (route/date entered from scratch on
+  ixigo). Increment 2 replaced this with the confirmed per-partner shapes
+  above; ixigo is no longer used for bus at all (see next point).
+- **ixigo for buses** — researched during Increment 2 and dropped: ixigo's
+  bus search needs an internal numeric city ID per city, not a plain place
+  name, so a name-only deep link isn't possible without building and
+  maintaining that ID table — out of scope for this increment.
+- **Aviasales' own deep-link shape, corrected (TWM-230 Increment 2d)** —
+  the shape this story originally implemented
+  (`search.aviasales.com/flights/?origin_iata=...`), from an older
+  Travelpayouts support article, was never browser-tested against the
+  live site until a full re-verification pass this session — it drops
+  every param and redirects to the `.ru` marketing homepage. The current
+  shape (table above) was confirmed against Travelpayouts' present
+  "Aviasales affiliate links" article and browser-verified directly.
+  Every other deep link in this document (ixigo train/flight/stay,
+  redBus, Booking.com) was re-verified live in the same pass and
+  confirmed genuinely working — this was the one gap.
 
 **Rejected outright:**
 
 - **MakeMyTrip** — carried over from an early mockup, never actually
   researched.
-- **12Go** (train) — see the Train row.
+- **12Go** (train) — real IRCTC bookings but ~30% over direct price and
+  built for foreign tourists.
+
+### The planning/service boundary
+
+A recurring question this story kept surfacing under different names —
+"how much plausibility checking is TWM's job" — resolved to one rule:
+**TWM owns geographic/planning facts; the provider owns service facts.**
+
+| TWM owns (stable, checkable now) | Provider owns (live, TWM never checks) |
+|---|---|
+| A real station/airport exists near a place (`station_resolution`, `airport_resolution`) | Whether a specific train/flight/bus service runs between two points |
+| A geographically sensible gateway/railhead for a hubless town (Atlas) | Whether a service from *this specific origin* reaches that gateway |
+| A mode is plausible for the distance involved (`feasibility.py`) | Schedule, frequency, seat availability, fare |
+| Which terminals exist in a multi-terminal city | Which terminal a specific service actually uses |
+
+TWM never turns a geography fact into an implied service fact — copy like
+"routed via {hub}" would claim a checked connection; the honest version
+("{hub} is the suggested gateway") states only the geographic fact and
+lets the provider's own search answer the service question.
+
+### Known transport gaps
+
+All four of these were investigated (TWM-230 Increment 2b plausibility
+discovery, triggered by a real Bhubaneswar→Sumerpur case where a resolved
+ixigo train link showed no trains for that route) and deliberately left
+unfixed — each needs real route/service-level data no open dataset or API
+currently provides (only station *existence* data does, which
+`station_resolution` already uses):
+
+- **Train/bus route existence** — resolving real station codes/city names
+  does not confirm a service actually connects them. A real Indian
+  train-timetable dataset was found and researched (data.gov.in via a
+  GitHub mirror) but the fix was deliberately not built — this is a
+  provider-owned service fact, not TWM's to maintain.
+- **Hub-selection connectivity** — Atlas validates a hub's last-mile
+  distance to the hubless town, never whether a service from the
+  traveler's actual origin reaches that hub. This was the real root cause
+  of the Bhubaneswar/Falna case above.
+- **Schedule/frequency** — a route can exist without running daily
+  (weekly trains, seasonal buses). Live data only; out of reach at this
+  product's current scope.
+- **Multi-terminal cities** (e.g. Mumbai CSTM/LTT/Dadar/Bandra Terminus) —
+  `station_resolution`'s curated overrides commit to one terminal per
+  city; a real connection via a different terminal could exist without
+  the resolver knowing.
 
 ## Activities & tickets
 
@@ -163,19 +239,44 @@ ticket partner is evaluated.
 
 A redirect link carries a tracking parameter only when a real tracking ID is
 configured; otherwise it is a plain, honest link with no affiliate
-disclosure shown. Two separate affiliate relationships:
+disclosure shown. Two separate affiliate relationships.
 
-- **Travelpayouts** — one marker. The network nominally covers Aviasales,
-  Hotellook, Booking.com, and Agoda, but tracking is **wired only for
-  Aviasales and Hotellook** (the shapes confirmed during research). It is the
-  same account the live flight-price path uses.
-- **ixigo** — its own account via EarnKaro / Cuelinks, covering flights,
-  trains, buses, and hotels. Separate signup, separate ID.
-- **redBus, Hostelworld** — affiliate programmes exist; no tracking wired.
+**Two different wiring shapes matter here (TWM-230 Increment 2b research)** —
+confusing them is why "just wire the tracking param" undersold the real
+work for half these partners:
 
-So **Booking.com and Agoda links currently carry no tracking** — the
-relationship is available but the tracked-link format isn't wired, and the
-links stay honest in the meantime.
+- **Shape A — direct query-param.** The network hands you a static ID; you
+  append it yourself as a URL param on the partner's own site. Self-serve,
+  code-only, no outbound call needed.
+- **Shape B — link-wrapping.** The network requires submitting your target
+  URL *to them* (their own tool, API, or redirect domain) and they hand back
+  a tracked link. Appending a param to the partner's own URL yourself does
+  **not** earn commission here — confirmed against Travelpayouts' and
+  EarnKaro's own documentation.
+
+| Partner | Programme | Shape | Wired? |
+|---|---|---|---|
+| Aviasales | Travelpayouts | A (`marker=`) | ✅ |
+| ixigo | EarnKaro / Cuelinks | A (`affiliate_id=`) | ✅ |
+| Booking.com | Travelpayouts | **B** — Partner Links API / `tp.media` redirect, or a per-account static `aid` if one is confirmed on the real dashboard | ❌ not wired |
+| redBus | EarnKaro | **B** — "paste your link, get a profit link" wrapper; no plain static param confirmed | ❌ not wired |
+
+(Agoda was dropped from the product entirely, TWM-230 Increment 2b — see
+Stay above — so it's not carried in this table anymore. Travelpayouts also
+covers it via the same Shape-B mechanism as Booking.com, plus a confirmed
+**1-day cookie window**, if it's ever revisited.)
+
+Confirming Booking.com/redBus's exact Shape-B mechanism needs the real
+Travelpayouts and EarnKaro account dashboards — public documentation
+describes the shape but not account-specific specifics (the Partner Links
+API endpoint, whether a static `aid` is issued, EarnKaro's link-generation
+API if any). If it turns out to require a live wrapping call, that is a
+small new integration (a link-wrapping step at request time), not a query-
+param change — its own scoped increment.
+
+So **Booking.com links currently carry no tracking** — the relationship is
+available but the tracked-link format isn't wired, and the links stay
+honest in the meantime.
 
 Tracking IDs are supplied only through environment configuration — never
 committed, never typed into a chat.
