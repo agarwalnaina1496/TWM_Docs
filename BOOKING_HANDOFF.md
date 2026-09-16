@@ -139,7 +139,7 @@ card — modes and partners are presented as equal options.
 
 | Mode | Partner(s) | What the traveller gets | Why this partner |
 |---|---|---|---|
-| **Flight** | Aviasales + ixigo | Aviasales: a **live cached price** when TWM can resolve one (the CHECK_PRICES path), plus a confirmed search-form redirect — origin, destination, dates, and passengers genuinely prefill *when both airports resolve*; otherwise a plain destination search. ixigo: a **second, independent** prefilled search (`ixigo.com/search/result/flight?from=...&to=...&date=DDMMYYYY&...`, browser-verified TWM-230 Increment 2c) under the same airport-resolution condition; otherwise the ixigo flights landing page. | Aviasales is TWM's integrated live-price partner (same Travelpayouts account as the live-price path). ixigo has its own confirmed deep link and its own EarnKaro affiliate account — a real second option, not a live-price path. |
+| **Flight** | Aviasales + ixigo | Aviasales: a **live cached price** when TWM can resolve one (the CHECK_PRICES path), plus a **prefilled search-results link** (`aviasales.com/search/{IATA}{DDMM}{IATA}[{DDMM}]{passengers}`, browser-verified TWM-230 Increment 2d) when both airports resolve; otherwise a dateless pre-filled *search form* (`aviasales.com/?params=...`) or the bare homepage. ixigo: a **second, independent** prefilled search (`ixigo.com/search/result/flight?from=...&to=...&date=DDMMYYYY&...`, browser-verified TWM-230 Increment 2c) under the same airport-resolution condition; otherwise the ixigo flights landing page. | Aviasales is TWM's integrated live-price partner (same Travelpayouts account as the live-price path). ixigo has its own confirmed deep link and its own EarnKaro affiliate account — a real second option, not a live-price path. |
 | **Train** | ixigo | A **prefilled search** (`ixigo.com/trains/search-pwa/from/{code}/to/{code}/{date}`) when both stations resolve to a real IRCTC-style station code and a date is known; otherwise a plain ixigo trains search. Station codes are resolved from a bundled ~8,700-row open dataset (`twm/services/station_resolution/`, CC0-licensed `datameet/railways` data), never a hand-typed place → code table. | IRCTC-authorised partner, India-native, no foreign-tourist markup. IRCTC itself has no documented deep link (a stateful single-page app) and was dropped as a partner. |
 | **Bus** | redBus | A **prefilled search** (`redbus.in/bus-tickets/{from}-to-{to}?onward={date}`) when origin and destination are known; the onward date is added when known. | redBus's route/date URL shape was browser-verified during TWM-230 Increment 2 research — the only bus partner with a confirmed public deep link. It has a confirmed EarnKaro affiliate programme, but tracking is not yet wired (see Affiliate & tracking). |
 | **Drive** | — | Distance and estimated duration, computed by TWM. No booking action. | Nothing to book — the traveller's own vehicle or a cab arranged locally. |
@@ -162,6 +162,17 @@ card — modes and partners are presented as equal options.
   bus search needs an internal numeric city ID per city, not a plain place
   name, so a name-only deep link isn't possible without building and
   maintaining that ID table — out of scope for this increment.
+- **Aviasales' own deep-link shape, corrected (TWM-230 Increment 2d)** —
+  the shape this story originally implemented
+  (`search.aviasales.com/flights/?origin_iata=...`), from an older
+  Travelpayouts support article, was never browser-tested against the
+  live site until a full re-verification pass this session — it drops
+  every param and redirects to the `.ru` marketing homepage. The current
+  shape (table above) was confirmed against Travelpayouts' present
+  "Aviasales affiliate links" article and browser-verified directly.
+  Every other deep link in this document (ixigo train/flight/stay,
+  redBus, Booking.com) was re-verified live in the same pass and
+  confirmed genuinely working — this was the one gap.
 
 **Rejected outright:**
 
