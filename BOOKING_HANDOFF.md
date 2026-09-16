@@ -181,6 +181,50 @@ card — modes and partners are presented as equal options.
 - **12Go** (train) — real IRCTC bookings but ~30% over direct price and
   built for foreign tourists.
 
+### The planning/service boundary
+
+A recurring question this story kept surfacing under different names —
+"how much plausibility checking is TWM's job" — resolved to one rule:
+**TWM owns geographic/planning facts; the provider owns service facts.**
+
+| TWM owns (stable, checkable now) | Provider owns (live, TWM never checks) |
+|---|---|
+| A real station/airport exists near a place (`station_resolution`, `airport_resolution`) | Whether a specific train/flight/bus service runs between two points |
+| A geographically sensible gateway/railhead for a hubless town (Atlas) | Whether a service from *this specific origin* reaches that gateway |
+| A mode is plausible for the distance involved (`feasibility.py`) | Schedule, frequency, seat availability, fare |
+| Which terminals exist in a multi-terminal city | Which terminal a specific service actually uses |
+
+TWM never turns a geography fact into an implied service fact — copy like
+"routed via {hub}" would claim a checked connection; the honest version
+("{hub} is the suggested gateway") states only the geographic fact and
+lets the provider's own search answer the service question.
+
+### Known transport gaps
+
+All four of these were investigated (TWM-230 Increment 2b plausibility
+discovery, triggered by a real Bhubaneswar→Sumerpur case where a resolved
+ixigo train link showed no trains for that route) and deliberately left
+unfixed — each needs real route/service-level data no open dataset or API
+currently provides (only station *existence* data does, which
+`station_resolution` already uses):
+
+- **Train/bus route existence** — resolving real station codes/city names
+  does not confirm a service actually connects them. A real Indian
+  train-timetable dataset was found and researched (data.gov.in via a
+  GitHub mirror) but the fix was deliberately not built — this is a
+  provider-owned service fact, not TWM's to maintain.
+- **Hub-selection connectivity** — Atlas validates a hub's last-mile
+  distance to the hubless town, never whether a service from the
+  traveler's actual origin reaches that hub. This was the real root cause
+  of the Bhubaneswar/Falna case above.
+- **Schedule/frequency** — a route can exist without running daily
+  (weekly trains, seasonal buses). Live data only; out of reach at this
+  product's current scope.
+- **Multi-terminal cities** (e.g. Mumbai CSTM/LTT/Dadar/Bandra Terminus) —
+  `station_resolution`'s curated overrides commit to one terminal per
+  city; a real connection via a different terminal could exist without
+  the resolver knowing.
+
 ## Activities & tickets
 
 **Explicitly out of scope for MVP** (TWM-205, decided 2026-08-26). Atlas
