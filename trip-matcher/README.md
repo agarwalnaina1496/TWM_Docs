@@ -2,7 +2,7 @@
 
 Trip Matcher helps a traveler move from open-ended trip context to a confident destination or circuit decision. Meridian is the agent that owns matcher conversation, clarification, ranking, and the visible matcher response.
 
-Scout performs entry routing. When Scout returns `intent = matcher`, the UI invokes Meridian automatically in the same chat turn. From that handoff onward, Meridian owns clarification and refinement; the UI sends later matching turns directly to Meridian. See the [overall TWM flow](../README.md) for cross-capability routing.
+Scout owns advice turns. A matching first-message route invokes Meridian directly, and Meridian owns extraction, clarification, and refinement; the UI sends later matching turns directly to Meridian. See the [overall TWM flow](../README.md) for cross-capability routing.
 
 ## Current Scope
 
@@ -21,7 +21,7 @@ Trip Matcher currently:
 
 ```mermaid
 flowchart TB
-    Start["Scout returns<br/>intent = matcher"]
+    Start["Matching first-message route<br/>calls Meridian"]
     Build["UI builds deep-merged Meridian phase slice<br/>trip_context + prior-advice context<br/>+ matcher_state + current message"]
     Handoff["Compact execution handoff<br/>POST /meridian → FastAPI validation<br/>n8n runs Meridian → FastAPI normalizes"]
     Result["Meridian call result<br/>status + message + state_delta<br/>traveler_criteria + evaluated options<br/>or a technical error"]
@@ -88,9 +88,8 @@ Selection is a deterministic UI write to `trip_context.selected_option` and move
 
 ```text
 Traveler asks for destination options
-  -> UI calls Scout because Scout owns entry
-  -> Scout returns intent = matcher plus trip_context delta
-  -> UI merges the delta and calls Meridian with the same message
+  -> UI routes the matching entry directly to Meridian
+  -> Meridian extracts the traveler's useful context from the raw message
   -> Meridian addresses the current ask from known context, asks one material question, and sets awaiting
   -> traveler answers briefly
   -> UI calls Meridian directly with current TripState and the new message

@@ -25,8 +25,7 @@ What connects the product is shared state and UI-owned phase routing: [TripState
 flowchart LR
     Traveler["Traveler"] --> UI["UI dispatcher<br/>owns stage + active_agent"]
     UI -->|new journey, entry, advice| Scout["Scout<br/>preserve context<br/>answer advice + route"]
-    Scout -->|intent = matcher| UI
-    UI -->|deep-merged phase slice<br/>+ current message| Meridian["Meridian<br/>address ask + evaluate readiness<br/>clarify + reason + match"]
+    UI -->|matching entry + deep-merged phase slice<br/>+ current message| Meridian["Meridian<br/>extract context + address ask<br/>clarify + reason + match"]
     Meridian -->|NEEDS_CLARIFICATION| UI
     UI -->|next matching message directly| Meridian
     Meridian -->|terminal outcome<br/>traveler criteria + evaluated options| UI
@@ -108,7 +107,7 @@ PLACEHOLDER
 
 ### Scout / Trip Matcher
 
-Scout is the conversational entry point for a new journey and for Scout-owned advice. It extracts raw trip context and returns a handoff intent. Matcher turns are handed to Meridian, which owns the visible matching conversation until a terminal outcome.
+Scout owns advice turns. Matching first-message routes go directly to Meridian, which extracts raw traveler context and owns the visible matching conversation until a terminal outcome.
 
 Details live in [Trip Matcher](trip-matcher/README.md), [Scout](trip-matcher/SCOUT.md), and [Meridian](trip-matcher/MERIDIAN.md).
 
@@ -127,9 +126,9 @@ trip_context
 
 Scout receives `stage`, `trip_context`, and `advisor_state`, plus the current user message. It extracts specific reusable traveler signals directly under `trip_context`, preserves each value verbatim with distinctions and qualifiers that affect later decisions, returns only new or updated context fields in `state_delta`, and returns routing through top-level `intent`. It does not copy the full query into context or write lifecycle/operational state.
 
-Meridian receives `trip_context`, the minimal read-only `advisor_state.conversation_context.last_advisor_message`, `matcher_state`, and the current traveler `message`. It addresses the current matching ask from known context, evaluates readiness without a universal field checklist, asks one material clarification when required, and recommends after the answer when ready. For a recommendation, it defines every material ask once as response-level `traveler_criteria` with source TripContext paths, then evaluates every option against the complete criterion set. It keeps constraints, assumptions, criterion-specific trade-offs, and circuit feasibility explicit. It does not receive `trip_id`, `status`, `stage`, `planner_state`, or UI-owned lifecycle fields.
+Meridian receives `trip_context`, the minimal read-only `advisor_state.conversation_context.last_advisor_message`, `matcher_state`, and the current traveler `message`. It extracts useful context from that message on every matching turn, then addresses the current matching ask, evaluates readiness without a universal field checklist, asks one material clarification when required, and recommends after the answer when ready. For a recommendation, it defines every material ask once as response-level `traveler_criteria` with source TripContext paths, then evaluates every option against the complete criterion set. It keeps constraints, assumptions, criterion-specific trade-offs, and circuit feasibility explicit. It does not receive `trip_id`, `status`, `stage`, `planner_state`, or UI-owned lifecycle fields.
 
-The UI validates shared criteria and option references before applying the terminal state delta or storing recommendation history. It renders compact ranked cards and one expanded **Why this works for you** panel, omits missing cost values, and preserves selection, refinement, provenance, lifecycle stage, and resume state. Meridian remains destination-level; after deterministic option selection, the UI exposes the Planner action and Planner owns future itinerary generation.
+The UI validates shared criteria and option references before applying the terminal state delta or storing recommendation history. It renders compact ranked cards and one expanded **Why this works for you** panel, omits missing cost values, and preserves selection, refinement, provenance, lifecycle stage, and resume state. The trip overview's context recap surfaces every non-empty traveler-provided `trip_context` key, keeping curated keys in their stable order and auto-humanizing additional free-form keys. Meridian remains destination-level; after deterministic option selection, the UI exposes the Planner action and Planner owns future itinerary generation.
 
 Neither agent currently has curated grounding or live verification. Time-sensitive guidance must be qualified and direct the traveler to relevant current checks rather than presenting unverified claims as current facts.
 

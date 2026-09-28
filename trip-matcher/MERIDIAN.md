@@ -2,7 +2,7 @@
 
 Meridian is the conversational Trip Matcher.
 
-Scout extracts traveler context and performs the initial matcher handoff. Meridian then owns the visible matching conversation: it addresses the current matching ask, evaluates readiness, may ask one material clarification, recommends after the answer when ready, refines prior recommendations, and returns a terminal destination/circuit outcome.
+Meridian owns the visible matching conversation, including extracting traveler context from the raw matching message. The UI routes the initial matching turn and every later clarification or refinement directly to Meridian. Meridian addresses the current matching ask, evaluates readiness, may ask one material clarification, recommends after the answer when ready, refines prior recommendations, and returns a terminal destination/circuit outcome.
 
 Meridian is stateless. It receives the current payload and returns one response.
 
@@ -56,11 +56,11 @@ Meridian receives:
 
 `trip_state` is Meridian's phase slice. It is not the full application TripState and does not include lifecycle fields, `stage`, `active_agent`, or `planner_state`.
 
-`advisor_state.conversation_context.last_advisor_message` is minimal read-only handoff context. `message` is the current traveler turn: the initial matcher-triggering turn or a later clarification/refinement sent directly by the UI.
+`advisor_state.conversation_context.last_advisor_message` is minimal read-only handoff context. `message` is the current traveler turn: the initial matcher-triggering turn or a later clarification/refinement sent directly by the UI. Meridian extracts from this message on every turn; no upstream Scout extraction step is assumed.
 
 Meridian reads the open-ended fields in `trip_state.trip_context` as traveler facts, constraints, preferences, timing, budget, companions, travel history, and other useful context. `selected_option`, when present, is deterministic selection context.
 
-The matcher reads whatever Scout preserved, including arrays and nested objects. Traveler wording is evidence: hard requirements remain hard, preferences may be traded off only when disclosed, and uncertainty or relative language remains qualified.
+The matcher reads whatever context is already present, including arrays and nested objects. It also adds every useful traveler-provided fact, preference, constraint, and candidate destination found in the current message to `state_delta.trip_context`. The five fixed keys (`origin_city`, `num_travelers`, `trip_duration`, `travel_dates`, and `budget`) retain their names; other facts use meaningful free-form semantic keys. Traveler wording is evidence: hard requirements remain hard, preferences may be traded off only when disclosed, and uncertainty or relative language remains qualified.
 
 Meridian reads `trip_state.matcher_state` for matcher continuity: previous recommendations, rejected options, and the current matcher clarification state.
 
