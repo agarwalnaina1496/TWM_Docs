@@ -7,7 +7,7 @@ Stages are UI-owned lifecycle state. They are separate from Scout's per-turn `in
 | Event | UI routing result |
 |---|---|
 | New journey | `active_agent = scout` |
-| Scout returns validated `intent = matcher` | `active_agent = meridian` |
+| Matching first-message route is accepted | `active_agent = meridian` |
 | Meridian returns `NEEDS_CLARIFICATION` | Keep `active_agent = meridian` |
 | Meridian returns a terminal business status | Clear `active_agent` |
 | Retryable infrastructure failure | Preserve the current `active_agent` and valid state |
@@ -16,7 +16,7 @@ Stages are UI-owned lifecycle state. They are separate from Scout's per-turn `in
 ```mermaid
 stateDiagram-v2
     [*] --> ScoutOwned: new journey
-    ScoutOwned --> MeridianOwned: UI handles matcher handoff
+    ScoutOwned --> MeridianOwned: UI accepts matching route
     MeridianOwned --> MeridianOwned: clarification or refinement
     MeridianOwned --> NoSpecialist: terminal outcome
     NoSpecialist --> MeridianOwned: refine recommendations
@@ -27,7 +27,7 @@ stateDiagram-v2
 
 | From Stage | To Stage | Trigger |
 |---|---|---|
-| `new` | `matching` | UI handles Scout's validated Matcher handoff |
+| `new` | `matching` | UI accepts the matching first-message route |
 | `matching` | `matching` | Meridian asks a soft clarification with `NEEDS_CLARIFICATION` |
 | `matching` | `recommended` | Meridian returns recommendation or matcher business output |
 | `recommended` | `matched` | User selects or clearly confirms one destination/circuit |

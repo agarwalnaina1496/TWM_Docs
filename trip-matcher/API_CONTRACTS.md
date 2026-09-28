@@ -9,6 +9,8 @@ For the canonical state model, see [TripState](../TRIP_STATE.md).
 ```text
 POST /scout
 POST /meridian
+POST /trips/first-message
+POST /trips/{trip_id}/commands
 ```
 
 ---
@@ -71,7 +73,7 @@ Rules:
 
 ## POST /meridian
 
-The UI calls Meridian automatically when Scout returns `intent = matcher`. It then routes later matching turns directly to Meridian while `active_agent = meridian`.
+The matching first-message route calls Meridian directly. The UI then routes later matching turns directly to Meridian while `active_agent = meridian`.
 
 Request:
 
@@ -110,7 +112,39 @@ message, when a traveler turn is present
 
 On initial handoff, UI first merges Scout's traveler-context delta and then builds this request. On continuation, `message` is the new clarification or refinement turn and Scout is not called again.
 
-Meridian first addresses the current matching ask using known context, then evaluates readiness for the requested recommendation rather than enforcing a universal required-field list. When one material clarification is required, it gives brief useful guidance and asks exactly one targeted question; after the answer, it recommends when ready. Constraint accounting, explicit assumptions, traveler-specific trade-offs, and circuit feasibility are canonical in [Meridian](MERIDIAN.md).
+Meridian first extracts useful traveler-provided context from the current message, then addresses the current matching ask using that context and the known state. It evaluates readiness for the requested recommendation rather than enforcing a universal required-field list. When one material clarification is required, it gives brief useful guidance and asks exactly one targeted question; after the answer, it recommends when ready. Constraint accounting, explicit assumptions, traveler-specific trade-offs, and circuit feasibility are canonical in [Meridian](MERIDIAN.md).
+
+### First-message orchestration
+
+`POST /trips/first-message` creates the trip and runs the first agent turn as one logical operation. The request requires a client-generated `idempotency_key` scoped to the guest session:
+
+```json
+{
+  "entry_intent": "discover | known_destination",
+  "message": "string",
+  "title": "Untitled Trip",
+  "product_mode": "self_led | twm_led",
+  "idempotency_key": "uuid"
+}
+```
+
+Retrying the same request with the same key replays the original result without running the agent or creating another trip. Reusing that key with a different request is rejected with HTTP `409`. The key is required because no trip ID exists yet when the first request begins.
+
+### Deterministic trip commands
+
+`POST /trips/{trip_id}/commands` accepts typed commands with an idempotency key and expected version. Planner editing includes:
+
+```json
+{
+  "command": "remove_place",
+  "place_name": "A place in the itinerary",
+  "day_number": 2,
+  "idempotency_key": "uuid",
+  "expected_version": 7
+}
+```
+
+`place_name` is required for `remove_place`; `day_number` optionally scopes removal when the same place appears on multiple days. The command updates the persisted itinerary deterministically and does not regenerate the complete plan.
 
 Response:
 
@@ -274,7 +308,7 @@ Current UI-owned transitions:
 
 ```text
 Trip created -> new
-Scout returns intent = matcher -> matching
+Matching entry is handled by Meridian -> matching
 Meridian returns NEEDS_CLARIFICATION -> matching
 Meridian returns recommendation/failure output -> recommended
 User chooses destination/circuit -> matched
@@ -346,7 +380,7 @@ Starting a new journey clears pending retry state and resets `active_agent = sco
 
 ### Clarification continuation
 
-Scout returns `intent = matcher`. UI merges Scout's context delta, sets `active_agent = meridian`, and calls Meridian with the same traveler message. If Meridian returns `NEEDS_CLARIFICATION`, UI keeps Meridian active and sends the next traveler reply directly to Meridian with the persisted matcher context.
+For a matching entry, the first-message orchestration routes the raw traveler turn to Meridian and persists its context delta. UI sets `active_agent = meridian`. If Meridian returns `NEEDS_CLARIFICATION`, UI keeps Meridian active and sends the next traveler reply directly to Meridian with the persisted matcher context. Scout owns advice turns, not the Meridian extraction path.
 
 ### Terminal outcome
 

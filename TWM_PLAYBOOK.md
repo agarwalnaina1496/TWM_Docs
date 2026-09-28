@@ -23,7 +23,7 @@ These are two distinct concepts and should never be conflated.
 - No phase switch occurs here - the traveler stays in the same phase.
 
 **Phase Transition** - happens only when the current phase is complete:
-- Scout's validated `matcher` intent hands the active conversation to Meridian.
+- A matching first-message route hands the active conversation directly to Meridian.
 - A Meridian terminal outcome returns lifecycle control to the UI.
 - Destination selection and subsequent Planner navigation are deterministic UI actions.
 - Completing advice does not itself change lifecycle stage; a later explicit recommendation or planning request is routed as a new turn.
@@ -52,7 +52,7 @@ Examples:
 - Advise signal only -> route to **Advise**.
 - Advise + Matcher signals both present -> route to **Advise** and resolve the concern without performing recommendation work in that response.
 - Advise + Planner signals both present and destination is already decided -> route to **Advise** first; planning remains a later explicit turn or UI action.
-- Matcher signal only (no destination confirmed yet) -> route to **Matcher**.
+- Matcher signal only (no destination confirmed yet) -> route to **Matcher**; the matching entry turn is handled directly by Meridian, which extracts the traveler's useful context from the raw message.
 - Matcher + Planner signals both present (traveler wants suggestions and asks for itinerary), but no destination confirmed yet -> route to **Matcher**. UI exposes the Planner action after a destination is confirmed.
 - Destination already confirmed (by the traveler, this turn or earlier) + itinerary ask -> route to **Planner** directly.
 - No Advise, Matcher, or Planner signal at all (fully self-contained query) -> resolve directly, no phase section needed.

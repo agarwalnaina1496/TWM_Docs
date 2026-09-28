@@ -6,7 +6,7 @@
 
 `TripState` carries what the traveler has actually told the system, plus lifecycle state needed by the product.
 
-The UI stores the complete `TripState` and sends each agent only its approved phase slice. Scout receives entry/advice turns. After matching handoff, Meridian receives later clarification and refinement turns directly until a terminal outcome.
+The UI stores the complete `TripState` and sends each agent only its approved phase slice. Scout receives entry/advice turns. Meridian receives the initial matching turn and later clarification/refinement turns directly until a terminal outcome, extracting useful context from each matching message.
 
 ## Design Principles
 
@@ -30,7 +30,7 @@ Do not create placeholder fields for information that has not been discovered.
 }
 ```
 
-Scout adds fields only when the traveler supplies that signal. There are no predefined trip-context fields, no `required_inputs`, and no null placeholders.
+The active conversational agent adds fields only when the traveler supplies that signal. There are no predefined trip-context fields, no `required_inputs`, and no null placeholders.
 
 Context fidelity includes meaning, not only values. Identity, residence, nationality, and departure origin remain distinct. Relative language, uncertainty, flexibility, destination categories, comparison goals, route concerns, seasonal relevance, trip shape, and stated budget boundaries remain qualified and related as the traveler supplied them.
 
@@ -142,7 +142,7 @@ meridian -> UI sends the next matching clarification/refinement directly to Meri
 null     -> no agent currently owns a specialist conversation
 ```
 
-UI sets `active_agent = meridian` after a validated Scout matcher handoff, keeps it through `NEEDS_CLARIFICATION`, clears it on a terminal Meridian outcome, and resets it to `scout` for a new journey.
+UI sets `active_agent = meridian` when the matching first-message route is accepted, keeps it through `NEEDS_CLARIFICATION`, clears it on a terminal Meridian outcome, and routes a new advice journey to `scout`.
 
 ## trip_context
 
@@ -313,7 +313,7 @@ The semantic contract should not change when storage moves from localStorage to 
 | Action | Stage becomes |
 |---|---|
 | TripState created | `new` |
-| UI handles Scout's validated Matcher handoff | `matching` |
+| UI accepts the matching first-message route | `matching` |
 | Meridian asks one material clarification | `matching` |
 | Meridian recommendation/failure output is returned to UI | `recommended` |
 | User refines recommendations after `recommended` | `matching` |

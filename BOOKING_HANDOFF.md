@@ -122,7 +122,7 @@ which is a routing heuristic, not a price or quality claim.
 
 | Mode | Partner | What the traveller gets | Why this partner |
 |---|---|---|---|
-| **Flight** | Aviasales | A **live cached price** when TWM can resolve one (the CHECK_PRICES path), plus an Aviasales search-form redirect. The Aviasales format is confirmed, so origin, destination, dates, and passengers genuinely prefill. | Aviasales is TWM's integrated flight partner — same Travelpayouts account as the live-price path. |
+| **Flight** | Aviasales and ixigo | A **live cached price** when TWM can resolve one (the CHECK_PRICES path) plus an Aviasales search-form redirect. ixigo is an additional approved flight redirect. | Aviasales is TWM's integrated live-price partner. ixigo uses its own confirmed IATA-based search link and separate affiliate configuration. |
 | **Train** | ixigo | A redirect to ixigo. The traveller enters the route and date on ixigo. | IRCTC-authorised partner, India-native, no foreign-tourist markup. IRCTC has no usable public API; unofficial scrapers are legally grey and unreliable. 12Go was dropped — real IRCTC bookings but ~30% over direct price and built for foreign tourists. |
 | **Bus** | ixigo | A redirect to ixigo, same as train. | Same reasoning as train. |
 | **Drive** | — | Distance and estimated duration, computed by TWM. No booking action. | Nothing to book — the traveller's own vehicle or a cab arranged locally. |
@@ -134,10 +134,9 @@ way there is for stay.
 
 **Decided in research, superseded or unshipped:**
 
-- **ixigo as a flight redirect** — TWM-131 approved ixigo as a second flight
-  option. TWM-196 replaced it with the Aviasales search-form redirect (same
-  Travelpayouts account as the live price), so ixigo is no longer a flight
-  partner.
+- **ixigo as a flight redirect** — ixigo is now an approved second flight
+  redirect alongside Aviasales. It does not carry the Aviasales live-price
+  offer; the UI attaches live flight results only to the Aviasales card.
 - **redBus for buses** — verified affiliate programme (EarnKaro, ~₹150 per
   booking). It is in the bus allowlist and its base domain is wired, but the
   UI only ever asks for a mode, never a specific bus partner, so ixigo is
@@ -166,16 +165,17 @@ configured; otherwise it is a plain, honest link with no affiliate
 disclosure shown. Two separate affiliate relationships:
 
 - **Travelpayouts** — one marker. The network nominally covers Aviasales,
-  Hotellook, Booking.com, and Agoda, but tracking is **wired only for
-  Aviasales and Hotellook** (the shapes confirmed during research). It is the
+  Hotellook, Booking.com, and Agoda, but tracking is **wired for Aviasales
+  only** among the currently shipped partners. It is the
   same account the live flight-price path uses.
 - **ixigo** — its own account via EarnKaro / Cuelinks, covering flights,
   trains, buses, and hotels. Separate signup, separate ID.
 - **redBus, Hostelworld** — affiliate programmes exist; no tracking wired.
 
-So **Booking.com and Agoda links currently carry no tracking** — the
-relationship is available but the tracked-link format isn't wired, and the
-links stay honest in the meantime.
+So **Booking.com, Agoda, and ixigo links carry no Travelpayouts marker**.
+ixigo may carry its separate `affiliate_id` when configured; Booking.com has
+no wired tracking parameter, and Agoda is no longer an approved shipped
+partner.
 
 Tracking IDs are supplied only through environment configuration — never
 committed, never typed into a chat.
