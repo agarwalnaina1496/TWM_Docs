@@ -137,8 +137,7 @@ Response:
     {
       "id": "comfortable_weather",
       "label": "Comfortable weather for the travel month",
-      "requirement_type": "PREFERENCE",
-      "source_context_paths": ["travel_month", "weather_preference"]
+      "requirement_type": "PREFERENCE"
     }
   ],
   "options": [
@@ -171,7 +170,7 @@ Response:
 }
 ```
 
-`traveler_criteria` defines the material ask once at response level. Each criterion has a unique `id`, a unique traveler-facing `label`, its `HARD` or `PREFERENCE` meaning, and the TripContext paths that supplied it. A source path belongs to only one criterion. Every option must evaluate every criterion exactly once through `criterion_id`; unknown, duplicate, or missing references make the recommendation payload invalid.
+`traveler_criteria` defines the material ask once at response level. Each criterion has a unique `id`, a unique traveler-facing `label`, its `HARD` or `PREFERENCE` meaning. Criteria carry no provenance: one free-text TripContext field routinely feeds several asks, so mapping asks to fields would constrain what Meridian can express without serving any consumer. Every option must evaluate every criterion exactly once through `criterion_id`; unknown, duplicate, or missing references make the recommendation payload invalid. Rank numbers are positions: Backend numbers `options` 1..n in the order returned (honouring any ranks Meridian supplied) and derives the response `trip_type` from the options, so neither can invalidate a recommendation.
 
 The top-level `message` introduces the ranking. `summary` orients the traveler to one option. Each evaluation `conclusion` answers one criterion, `details` supplies approved `bullets`, `facts`, or `cost_breakdown` evidence, and `tradeoffs` stays attached to the affected criterion. `other_considerations` is only for residual information that does not belong to one criterion.
 

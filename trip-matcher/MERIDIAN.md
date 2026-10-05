@@ -203,8 +203,7 @@ The recommendation response defines each material ask once in top-level `travele
     {
       "id": "criterion_id",
       "label": "Traveler-facing criterion label",
-      "requirement_type": "HARD | PREFERENCE",
-      "source_context_paths": ["travel_month"]
+      "requirement_type": "HARD | PREFERENCE"
     }
   ],
   "options": [
@@ -234,7 +233,7 @@ The recommendation response defines each material ask once in top-level `travele
 
 The chat `message` introduces the ranking without duplicating the cards. An option `summary` briefly orients the traveler. Each evaluation `conclusion` states the option-specific answer for one criterion. Its `details` provide approved evidence as `bullets`, `facts`, or `cost_breakdown`. A `TRADEOFF` or `MISMATCH` keeps its practical costs in that evaluation's `tradeoffs`; residual facts that do not map to one criterion belong in `other_considerations`.
 
-Every material traveler input maps to one criterion with one or more `source_context_paths`. Criterion IDs and labels are unique, and one source path cannot belong to multiple criteria. Every option evaluates the same complete criterion set exactly once, so the UI can compare options without fixed report sections. `HARD` criteria cannot be silently relaxed or evaluated as `MISMATCH`. When the traveler is already considering options, the criteria reflect the decision factors in that ask.
+Every material traveler ask becomes one criterion; criteria carry no source-field provenance, since a single free-text field often holds several asks. Criterion IDs and labels are unique. Every option evaluates the same complete criterion set exactly once, so the UI can compare options without fixed report sections. `HARD` criteria cannot be silently relaxed or evaluated as `MISMATCH`. When the traveler is already considering options, the criteria reflect the decision factors in that ask.
 
 `MATCH` has no trade-offs. `TRADEOFF` and `MISMATCH` require at least one trade-off. Missing cost data is omitted, never represented by zero. A cost block uses valid non-negative estimate ranges and one currency; it must contain at least one numeric line item or total.
 
@@ -280,3 +279,6 @@ Planner finished          -> planned
 ```
 
 Legacy `recommendation_ready` is no longer part of the primary flow.
+
+
+Backend, not Meridian, owns the bookkeeping that follows from an outcome: the option-set `trip_type`, rank numbering, `conversation_context.awaiting` (set by Meridian only on `NEEDS_CLARIFICATION`, cleared by Backend otherwise), and `conversation_context.last_meridian_message` (always the visible `message`). Harmless slips in what Meridian does decide -- an empty list for an absent field, an unknown key -- are healed at the contract boundary instead of failing the response; only violations a consumer or the trust boundary depends on are rejected.
